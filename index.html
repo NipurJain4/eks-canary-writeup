@@ -1,0 +1,653 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>
+<style id="creative-enhance">
+/* ---- Reading progress bar ---- */
+#progress{position:fixed;top:0;left:0;height:3px;width:0;z-index:999;
+  background:linear-gradient(90deg,var(--accent),var(--ok));
+  transition:width .1s linear;box-shadow:0 0 8px var(--accent)}
+
+/* ---- Floating control dock (theme toggle + back-to-top) ---- */
+#dock{position:fixed;right:16px;bottom:16px;z-index:998;display:flex;flex-direction:column;gap:8px}
+#dock button{width:42px;height:42px;border-radius:50%;border:1px solid var(--line);
+  background:var(--surface);color:var(--ink);font-size:18px;cursor:pointer;
+  box-shadow:0 2px 10px rgba(0,0,0,.15);transition:transform .15s,background .2s}
+#dock button:hover{transform:translateY(-2px) scale(1.05);background:var(--accent-soft)}
+#toTop{opacity:0;pointer-events:none;transition:opacity .3s}
+#toTop.show{opacity:1;pointer-events:auto}
+
+/* ---- Animated hero gradient underline ---- */
+h1{position:relative}
+h1::after{content:"";display:block;height:4px;width:120px;margin-top:14px;border-radius:4px;
+  background:linear-gradient(90deg,var(--accent),var(--ok),var(--warn),var(--accent));
+  background-size:300% 100%;animation:flow 6s ease infinite}
+@keyframes flow{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
+
+/* ---- Stat strip (count-up) ---- */
+#stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;
+  background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden;
+  max-width:900px;margin:26px 0 8px}
+#stats .st{background:var(--surface);padding:16px 18px;text-align:center}
+#stats .st .big{font:800 30px/1 var(--display);color:var(--accent);font-variant-numeric:tabular-nums}
+#stats .st .cap{font:600 11px var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-top:6px}
+
+/* ---- Section fade-in on scroll ---- */
+section{opacity:1}
+section.reveal{opacity:0;transform:translateY(18px)}
+section.reveal.in{opacity:1;transform:none;transition:opacity .6s ease,transform .6s ease}
+
+/* ---- TOC active highlight (scroll-spy) ---- */
+.toc li a.active{color:var(--accent);background:var(--accent-soft);
+  border-left:2px solid var(--accent);margin-left:-2px;font-weight:600}
+
+/* ---- Hover polish on boxes & diagrams ---- */
+.bx,.issue,.diagram{transition:transform .18s ease,box-shadow .18s ease}
+.bx:hover,.issue:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(10,107,104,.12)}
+.diagram:hover{box-shadow:0 8px 28px rgba(0,0,0,.10)}
+
+/* ---- Code block: subtle accent on hover ---- */
+.code pre{transition:border-color .2s}
+.code:hover pre{border-color:var(--accent)}
+
+/* ---- Badge pulse ---- */
+.badge{position:relative}
+.badge::before{content:"";position:absolute;inset:-3px;border-radius:99px;
+  border:2px solid var(--ok);opacity:0;animation:pulse 2.4s ease-out infinite}
+@keyframes pulse{0%{opacity:.5;transform:scale(1)}100%{opacity:0;transform:scale(1.4)}}
+
+@media (prefers-reduced-motion: reduce){
+  h1::after,.badge::before{animation:none}
+  section.reveal{opacity:1;transform:none}
+}
+</style>
+</head><body>
+<div id="progress"></div>
+<div id="dock">
+  <button id="themeBtn" title="Toggle light/dark" aria-label="Toggle theme">◐</button>
+  <button id="toTop" title="Back to top" aria-label="Back to top">↑</button>
+</div>
+
+<title>EKS Canary Project</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  /* layout: sticky contents rail + one reading column; diagrams sit full width of the column in scroll frames */
+  --bg:#F3F6F7; --surface:#FFFFFF; --ink:#12202B; --muted:#4D5F6E; --line:#D3DCE2;
+  --accent:#0A6B68; --accent-soft:#DDF0EE; --warn:#935300; --warn-soft:#FBEBD0;
+  --code-bg:#E9EEF1; --ok:#1F6F36; --ok-soft:#DCF1E2;
+  --display:'Bricolage Grotesque','Segoe UI',system-ui,sans-serif;
+  --sans:'IBM Plex Sans','Segoe UI',system-ui,sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0D151B; --surface:#141F27; --ink:#E5ECF1; --muted:#9BAEBD; --line:#2A3A47;
+  --accent:#4FC1BA; --accent-soft:#12312E; --warn:#E8B05A; --warn-soft:#382B12;
+  --code-bg:#0A1116; --ok:#6FCB88; --ok-soft:#14301D; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0D151B; --surface:#141F27; --ink:#E5ECF1; --muted:#9BAEBD; --line:#2A3A47;
+  --accent:#4FC1BA; --accent-soft:#12312E; --warn:#E8B05A; --warn-soft:#382B12;
+  --code-bg:#0A1116; --ok:#6FCB88; --ok-soft:#14301D; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:400 15px/1.65 var(--sans);padding-inline:16px;padding-block:0 64px}
+a{color:var(--accent)}
+.mast-in{max-width:1180px;margin:0 auto;position:relative;isolation:isolate;padding-block:44px 8px}
+.mast-in::before{content:"";position:absolute;inset:0 -16px;z-index:-1;
+  background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);
+  background-size:28px 28px;opacity:.55;
+  -webkit-mask-image:linear-gradient(#000 30%,transparent);mask-image:linear-gradient(#000 30%,transparent)}
+.kicker{font:600 12px var(--sans);letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin:0 0 10px}
+h1{font:800 clamp(30px,5.4vw,52px)/1.04 var(--display);margin:0 0 14px;max-width:18ch;text-wrap:balance;letter-spacing:-.02em}
+.lede{max-width:62ch;color:var(--muted);font-size:17px;margin:0 0 22px}
+.meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:8px;overflow:hidden;max-width:900px}
+.meta div{background:var(--surface);padding:10px 14px;min-width:0}
+.meta dt{font:600 11px var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.meta dd{margin:2px 0 0;font:500 14px var(--sans);overflow-wrap:anywhere}
+.badge{display:inline-block;font:600 12px var(--sans);padding:2px 9px;border-radius:99px;background:var(--ok-soft);color:var(--ok)}
+.wrap{max-width:1180px;margin:34px auto 0;display:grid;grid-template-columns:230px minmax(0,1fr);gap:48px;align-items:start}
+.toc{position:sticky;top:env(safe-area-inset-top,0px);padding-top:12px;max-height:100vh;overflow-y:auto}
+.toc summary{font:600 12px var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);cursor:pointer;margin-bottom:8px}
+.toc ol{list-style:none;margin:0;padding:0;border-left:2px solid var(--line)}
+.toc li a{display:block;padding:5px 12px;font-size:13.5px;line-height:1.35;color:var(--muted);text-decoration:none}
+.toc li a:hover,.toc li a:focus-visible{color:var(--accent);background:var(--accent-soft)}
+.toc .grp-t{font:600 11px var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--ink);padding:12px 12px 2px}
+main{min-width:0;max-width:860px}
+section{padding-top:44px}
+section:first-child{padding-top:0}
+h2{font:700 clamp(24px,3.4vw,32px)/1.15 var(--display);margin:0 0 6px;letter-spacing:-.015em;text-wrap:balance;scroll-margin-top:16px}
+h2 .n{color:var(--accent);margin-right:10px;font-variant-numeric:tabular-nums}
+h3{font:600 17px/1.3 var(--sans);margin:30px 0 8px;scroll-margin-top:16px}
+h3 .n{color:var(--muted);font-weight:500;margin-right:8px;font-variant-numeric:tabular-nums}
+p{margin:0 0 14px;max-width:68ch}
+ul,ol.plain{margin:0 0 14px;padding-left:22px;max-width:68ch}
+li{margin-bottom:5px}
+code{font:400 .88em var(--mono);background:var(--code-bg);padding:1px 5px;border-radius:4px;overflow-wrap:anywhere}
+.code{position:relative;margin:0 0 18px}
+.code pre{margin:0;background:var(--code-bg);border:1px solid var(--line);border-radius:8px;padding:14px 16px;overflow-x:auto;font:400 13px/1.55 var(--mono);color:var(--ink)}
+.code pre code{background:none;padding:0;font:inherit;overflow-wrap:normal}
+.code .clabel{position:absolute;top:-9px;left:12px;background:var(--bg);padding:0 6px;font:600 10.5px var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.copy{position:absolute;top:8px;right:8px;font:500 12px var(--sans);padding:3px 9px;border-radius:5px;border:1px solid var(--line);background:var(--surface);color:var(--muted);cursor:pointer}
+.copy:hover,.copy:focus-visible{color:var(--accent);border-color:var(--accent)}
+.tablewrap{overflow-x:auto;margin:0 0 20px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th{font:600 11.5px var(--sans);letter-spacing:.07em;text-transform:uppercase;color:var(--muted);text-align:left;padding:9px 14px;border-bottom:1px solid var(--line);background:var(--bg);white-space:nowrap}
+td{padding:9px 14px;border-top:1px solid var(--line);vertical-align:top;min-width:120px}
+tbody tr:first-child td{border-top:0}
+td:first-child{font-weight:500}
+.note{border:1px solid var(--line);border-left:3px solid var(--accent);background:var(--surface);border-radius:6px;padding:12px 16px;margin:0 0 18px;max-width:68ch}
+.note.warn{border-left-color:var(--warn)}
+.note b.t{display:block;font:600 11.5px var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin-bottom:3px}
+.note.warn b.t{color:var(--warn)}
+.note p:last-child{margin:0}
+.diagram{margin:20px 0 24px;border:1px solid var(--line);border-radius:10px;background:var(--surface);overflow:hidden}
+.diagram .scroll{overflow-x:auto;padding:12px}
+.diagram svg{display:block;width:100%;height:auto;font-family:var(--sans)}
+.diagram figcaption{font-size:13px;color:var(--muted);padding:10px 16px 12px;border-top:1px solid var(--line);max-width:none}
+.bx{fill:var(--surface);stroke:var(--line);stroke-width:1.3}
+.bx.acc{fill:var(--accent-soft);stroke:var(--accent)}
+.bx.warn{fill:var(--warn-soft);stroke:var(--warn)}
+.grp{fill:none;stroke:var(--line);stroke-dasharray:4 4}
+.lbl{font:600 12.5px var(--sans);fill:var(--ink)}
+.sub{font:400 11px var(--sans);fill:var(--muted)}
+.gl{font:600 10.5px var(--sans);letter-spacing:.07em;text-transform:uppercase;fill:var(--muted)}
+.ln{fill:none;stroke:var(--muted);stroke-width:1.5}
+.ln.d{stroke-dasharray:5 4}
+.ln.a{stroke:var(--accent)}
+.ahead{fill:var(--muted)}
+.issues{display:grid;gap:14px;margin:0 0 20px}
+.issue{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px 18px;min-width:0}
+.issue h4{font:600 16px/1.3 var(--sans);margin:0 0 10px;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;scroll-margin-top:16px}
+.tag{font:600 10.5px var(--sans);letter-spacing:.07em;text-transform:uppercase;padding:2px 8px;border-radius:99px;background:var(--accent-soft);color:var(--accent)}
+.issue dl{margin:0;display:grid;grid-template-columns:84px minmax(0,1fr);gap:8px 14px}
+.issue dt{font:600 11.5px var(--sans);letter-spacing:.07em;text-transform:uppercase;color:var(--muted);padding-top:3px}
+.issue dd{margin:0;min-width:0}
+.issue dd p{margin:0 0 8px}
+.issue dd .code{margin:6px 0 4px}
+.tree{white-space:pre}
+@media (max-width:959px){
+  .wrap{grid-template-columns:minmax(0,1fr);gap:8px}
+  .toc{position:static;max-height:none;border:1px solid var(--line);border-radius:8px;background:var(--surface);padding:12px 14px}
+}
+@media (max-width:560px){
+  .issue dl{grid-template-columns:minmax(0,1fr)}
+  .issue dt{padding-top:0}
+}
+@media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+</style>
+<header class="mast-in">
+<p class="kicker">Project documentation</p>
+<h1>EKS canary deployments and a zero-downtime upgrade</h1>
+<p class="lede">A GitOps lab on Amazon EKS: Terraform infrastructure, Jenkins CI, Flux CD, Flagger canaries, and a Kubernetes 1.34 to 1.35 upgrade, documented in the order it was built.</p>
+
+<dl class="meta">
+<div><dt>Author</dt><dd>Nipur Jain</dd></div>
+<div><dt>Account</dt><dd>821410798987</dd></div>
+<div><dt>Region</dt><dd>ap-south-1 (Mumbai)</dd></div>
+<div><dt>Cluster</dt><dd>eks-canary-practice</dd></div>
+<div><dt>Period</dt><dd>Sept – Oct 2026</dd></div>
+<div><dt>Status</dt><dd><span class="badge">Completed</span> teardown Finish</dd></div>
+</dl>
+
+</header>
+<div id="stats" aria-label="Project at a glance">
+  <div class="st"><div class="big" data-count="65">0</div><div class="cap">AWS resources</div></div>
+  <div class="st"><div class="big" data-count="18">0</div><div class="cap">Problems solved</div></div>
+  <div class="st"><div class="big" data-count="8">0</div><div class="cap">Key decisions</div></div>
+  <div class="st"><div class="big" data-count="2">0</div><div class="cap">GitHub repos</div></div>
+  <div class="st"><div class="big" data-suffix="→1.35" data-count="1" data-prefix="1.34">0</div><div class="cap">EKS upgrade</div></div>
+</div>
+<div class="wrap">
+<nav class="toc" aria-label="Contents"><details id="toc" open><summary>Contents</summary><ol><li class="grp-t">Foundation</li><li><a href="#s1">1. Objective</a></li><li><a href="#s2">2. Technology stack</a></li><li><a href="#s3">3. Architecture</a></li><li class="grp-t">Build, in order</li><li><a href="#s4">4. Access and permissions</a></li><li><a href="#s5">5. Terraform remote state</a></li><li><a href="#s6">6. Infrastructure</a></li><li><a href="#s7">7. Load Balancer Controller</a></li><li><a href="#s8">8. GitOps and Flux</a></li><li><a href="#s9">9. The application</a></li><li><a href="#s10">10. Canary with Flagger</a></li><li><a href="#s11">11. CI with Jenkins</a></li><li><a href="#s12">12. EKS 1.34 to 1.35 upgrade</a></li><li class="grp-t">Outcome</li><li><a href="#s13">13. Results and cost</a></li><li><a href="#s14">14. Teardown and rebuild</a></li><li class="grp-t">Reference</li><li><a href="#s15">15. Problems and fixes</a></li><li><a href="#s16">16. Key decisions</a></li><li><a href="#s17">17. Lessons</a></li><li><a href="#s18">18. Repository layout</a></li></ol></details></nav>
+<main>
+
+<section id="s1">
+<h2><span class="n">1</span>Objective</h2>
+<p>This project is a hands-on lab built to learn and demonstrate three things:</p>
+<ul>
+<li><b>Progressive canary deployments.</b> Traffic moves to a new version in steps. The release is promoted if it stays healthy and rolled back automatically if it does not.</li>
+<li><b>A zero-downtime EKS version upgrade</b> from Kubernetes 1.34 to 1.35.</li>
+<li><b>A complete GitOps CI/CD pipeline</b> around both.</li>
+</ul>
+<p>The workload is <code>recharge-system</code>, a static &ldquo;QuickCharge&rdquo; web page (HTML and Tailwind) served by nginx. It is deliberately simple so that every moving part in the delivery path is the subject of the lab.</p>
+</section>
+
+<section id="s2">
+<h2><span class="n">2</span>Technology stack</h2>
+<div class="tablewrap"><table class=""><thead><tr><th>Layer</th><th>Tool</th><th>Role</th></tr></thead><tbody><tr><td>Infrastructure</td><td>Terraform</td><td>VPC, EKS, node group, ECR, IAM and IRSA, EBS CSI</td></tr><tr><td>Container registry</td><td>Amazon ECR</td><td>Stores the app image</td></tr><tr><td>CD (GitOps)</td><td>Flux CD</td><td>Reconciles manifests from GitHub into the cluster</td></tr><tr><td>Progressive delivery</td><td>Flagger + NGINX Ingress</td><td>Canary traffic shifting and metric analysis</td></tr><tr><td>Metrics</td><td>Prometheus</td><td>Success rate used to gate the canary</td></tr><tr><td>CI</td><td>Jenkins (in-cluster)</td><td>Builds with Kaniko, pushes to ECR, commits the tag</td></tr><tr><td>Source</td><td>GitHub</td><td>Application repo and GitOps repo</td></tr><tr><td>Compute</td><td>2× t3.medium Spot</td><td>Managed node group in ap-south-1</td></tr></tbody></table></div>
+<p>Two repositories carry the work:</p>
+<ul>
+<li>Application: <code>github.com/NipurJain4/recharge-system</code></li>
+<li>GitOps: <code>github.com/NipurJain4/eks-canary-gitops</code></li>
+</ul>
+</section>
+
+<section id="s3">
+<h2><span class="n">3</span>Architecture</h2>
+<p>The map below shows every component and where it runs. Later sections draw the detail of each part: the network, the credential model, the pipeline, the canary loop and the upgrade.</p>
+<figure class="diagram"><div class="scroll"><svg viewBox="0 0 900 520" style="min-width:700px" role="img" aria-label="End-to-end architecture of the EKS canary and CI/CD system"><defs><marker id="ah1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ahead"/></marker></defs><rect x="20" y="60" width="100" height="50" rx="6" class="bx "/><text x="70.0" y="89.0" class="lbl" text-anchor="middle">Developer</text><rect x="160" y="15" width="420" height="120" rx="10" class="grp"/><text x="170" y="31" class="gl" text-anchor="start">GitHub</text><rect x="175" y="50" width="185" height="70" rx="6" class="bx "/><text x="267.5" y="81.5" class="lbl" text-anchor="middle">recharge-system</text><text x="267.5" y="96.5" class="sub" text-anchor="middle">app · Dockerfile · Jenkinsfile</text><rect x="380" y="50" width="185" height="70" rx="6" class="bx "/><text x="472.5" y="81.5" class="lbl" text-anchor="middle">eks-canary-gitops</text><text x="472.5" y="96.5" class="sub" text-anchor="middle">manifests + image tag</text><rect x="160" y="165" width="720" height="345" rx="10" class="grp"/><text x="500" y="181" class="gl" text-anchor="start">AWS · ap-south-1</text><rect x="180" y="195" width="540" height="250" rx="10" class="grp"/><text x="560" y="211" class="gl" text-anchor="start">EKS cluster · v1.35</text><rect x="200" y="330" width="120" height="54" rx="6" class="bx "/><text x="260.0" y="353.5" class="lbl" text-anchor="middle">Jenkins</text><text x="260.0" y="368.5" class="sub" text-anchor="middle">in-cluster · Kaniko</text><rect x="380" y="235" width="120" height="54" rx="6" class="bx "/><text x="440.0" y="258.5" class="lbl" text-anchor="middle">Flux CD</text><text x="440.0" y="273.5" class="sub" text-anchor="middle">GitOps reconcile</text><rect x="550" y="235" width="120" height="54" rx="6" class="bx acc"/><text x="610.0" y="258.5" class="lbl" text-anchor="middle">Flagger</text><text x="610.0" y="273.5" class="sub" text-anchor="middle">canary controller</text><rect x="380" y="330" width="120" height="54" rx="6" class="bx "/><text x="440.0" y="353.5" class="lbl" text-anchor="middle">Prometheus</text><text x="440.0" y="368.5" class="sub" text-anchor="middle">15 s scrape</text><rect x="550" y="330" width="120" height="54" rx="6" class="bx "/><text x="610.0" y="353.5" class="lbl" text-anchor="middle">NGINX Ingress</text><text x="610.0" y="368.5" class="sub" text-anchor="middle">weighted routing</text><rect x="520" y="405" width="90" height="38" rx="6" class="bx "/><text x="565.0" y="420.5" class="lbl" text-anchor="middle">primary</text><text x="565.0" y="435.5" class="sub" text-anchor="middle">stable</text><rect x="615" y="405" width="90" height="38" rx="6" class="bx warn"/><text x="660.0" y="420.5" class="lbl" text-anchor="middle">canary</text><text x="660.0" y="435.5" class="sub" text-anchor="middle">new version</text><rect x="200" y="455" width="120" height="40" rx="6" class="bx "/><text x="260.0" y="479.0" class="lbl" text-anchor="middle">Amazon ECR</text><rect x="740" y="330" width="120" height="54" rx="6" class="bx "/><text x="800.0" y="353.5" class="lbl" text-anchor="middle">NLB</text><text x="800.0" y="368.5" class="sub" text-anchor="middle">internet-facing</text><rect x="740" y="60" width="120" height="50" rx="6" class="bx "/><text x="800.0" y="81.5" class="lbl" text-anchor="middle">Users</text><text x="800.0" y="96.5" class="sub" text-anchor="middle">browser</text><path d="M120 85 H175" class="ln" marker-end="url(#ah1)"/><text x="147" y="76" class="sub" text-anchor="middle">git push</text><path d="M267 120 V330" class="ln" marker-end="url(#ah1)"/><text x="259" y="300" class="sub" text-anchor="end">build trigger</text><path d="M260 384 V455" class="ln" marker-end="url(#ah1)"/><text x="268" y="425" class="sub" text-anchor="start">push image</text><path d="M300 330 L400 120" class="ln" marker-end="url(#ah1)"/><text x="376" y="155" class="sub" text-anchor="end">commit new tag</text><path d="M472 120 V235" class="ln" marker-end="url(#ah1)"/><text x="480" y="222" class="sub" text-anchor="start">watches</text><path d="M500 262 H550" class="ln" marker-end="url(#ah1)"/><text x="525" y="254" class="sub" text-anchor="middle">applies</text><path d="M610 289 V330" class="ln" marker-end="url(#ah1)"/><text x="618" y="314" class="sub" text-anchor="start">sets weight</text><path d="M550 280 L497 330" class="ln" marker-end="url(#ah1)"/><text x="500" y="312" class="sub" text-anchor="end">queries</text><path d="M550 357 H500" class="ln" marker-end="url(#ah1)"/><text x="525" y="349" class="sub" text-anchor="middle">scrape</text><path d="M585 384 L565 405" class="ln" marker-end="url(#ah1)"/><path d="M635 384 L660 405" class="ln" marker-end="url(#ah1)"/><path d="M740 357 H670" class="ln" marker-end="url(#ah1)"/><path d="M800 110 V330" class="ln" marker-end="url(#ah1)"/></svg></div><figcaption>End-to-end system map. Nodes in the cluster pull images from ECR; Jenkins pushes to it.</figcaption></figure><div class="tablewrap"><table class=""><thead><tr><th>Component</th><th>Namespace</th><th>Purpose</th></tr></thead><tbody><tr><td>Flux controllers</td><td>flux-system</td><td>GitOps reconciliation</td></tr><tr><td>NGINX Ingress</td><td>ingress-nginx</td><td>Traffic router behind the NLB</td></tr><tr><td>Flagger</td><td>flagger-system</td><td>Canary controller</td></tr><tr><td>Prometheus</td><td>flagger-system</td><td>Metrics for canary decisions</td></tr><tr><td>loadtester</td><td>flagger-system</td><td>Generates traffic during canary analysis</td></tr><tr><td>Jenkins</td><td>jenkins</td><td>CI: build, push, commit</td></tr><tr><td>recharge-system (primary and canary)</td><td>recharge-system</td><td>The application</td></tr><tr><td>traffic-generator</td><td>recharge-system</td><td>Steady background traffic for stable metrics</td></tr><tr><td>EBS CSI, LB controller, coredns, kube-proxy, vpc-cni</td><td>kube-system</td><td>Platform</td></tr></tbody></table></div>
+</section>
+
+<section id="s4">
+<h2><span class="n">4</span>Access and permissions</h2>
+<p>Everything below assumes <code>terraform</code>, <code>kubectl</code>, <code>helm</code>, <code>flux</code>, <code>git</code>, <code>docker</code>, <code>jq</code> and the AWS CLI are available locally.</p>
+
+<h3><span class="n">4.1</span>Install the missing CLIs</h3>
+<p>Both tools go into <code>~/.local/bin</code>, so no sudo is needed.</p>
+<div class="code"><span class="clabel">bash</span><pre><code>mkdir -p ~/.local/bin
+# jq
+curl -fsSL -o ~/.local/bin/jq https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-linux-amd64
+chmod +x ~/.local/bin/jq
+# flux CLI
+cd /tmp
+curl -fsSL -o flux.tar.gz https://github.com/fluxcd/flux2/releases/download/v2.4.0/flux_2.4.0_linux_amd64.tar.gz
+tar -xzf flux.tar.gz flux &amp;&amp; mv flux ~/.local/bin/flux &amp;&amp; chmod +x ~/.local/bin/flux
+export PATH="$HOME/.local/bin:$PATH"</code></pre></div>
+<h3><span class="n">4.2</span>Confirm AWS access</h3>
+<div class="code"><span class="clabel">bash</span><pre><code>aws sso login
+aws sts get-caller-identity   # must return your account and role, not an error</code></pre></div>
+<h3><span class="n">4.3</span>Permissions: IAM and the SCP</h3>
+<p>Two layers decide whether a call succeeds. IAM policies grant actions to a principal. A service control policy (SCP) is an organization-level guardrail that can only restrict, and an explicit SCP deny overrides any IAM allow. Fixing an SCP deny therefore needs the management-account administrator.</p>
+<p>In this account the SCP <code>p-jqf3wzw9</code> denies <code>eks:*</code> and <code>ecr:*</code> unless the principal is excluded. These principals were excluded:</p>
+<div class="tablewrap"><table class=""><thead><tr><th>Principal</th><th>Condition key</th><th>Pattern</th></tr></thead><tbody><tr><td>Your user</td><td><code>aws:userid</code></td><td><code>*:nipur@cloudthat.com</code></td></tr><tr><td>EKS node role</td><td><code>aws:PrincipalArn</code></td><td><code>arn:aws:iam::821410798987:role/default-eks-node-group-*</code></td></tr></tbody></table></div>
+<p>Wildcard patterns survive rebuilds, which is why the node role is excluded by pattern. Alongside the SCP, the IAM role needs companion actions for tagging, describing, <code>iam:PassRole</code> and optional KMS. They are listed in <code>missing-permissions-policy.json</code>, the file to hand to an administrator.</p>
+
+<h3><span class="n">4.4</span>Credential model</h3>
+<p>No static keys exist anywhere. Pods receive AWS credentials in one of two ways: IRSA, a role bound to a service account through the cluster's OIDC provider, or the node's instance role. The lab uses IRSA for the two controllers and the node role for Jenkins builds, because the node role was already SCP-excluded and refreshes itself.</p>
+<figure class="diagram"><div class="scroll"><svg viewBox="0 0 900 350" style="min-width:700px" role="img" aria-label="Credential model"><defs><marker id="ah6" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ahead"/></marker></defs><text x="20" y="22" class="gl" text-anchor="start">Who</text><text x="335" y="22" class="gl" text-anchor="start">How it authenticates</text><text x="690" y="22" class="gl" text-anchor="start">What it reaches</text><rect x="20" y="40" width="230" height="40" rx="6" class="bx "/><text x="135.0" y="64.0" class="lbl" text-anchor="middle">You: Terraform and kubectl</text><rect x="335" y="40" width="270" height="40" rx="6" class="bx "/><text x="470.0" y="56.5" class="lbl" text-anchor="middle">SSO role</text><text x="470.0" y="71.5" class="sub" text-anchor="middle">temporary, SCP-excluded</text><rect x="690" y="40" width="190" height="40" rx="6" class="bx "/><text x="785.0" y="64.0" class="lbl" text-anchor="middle">EKS, EC2, S3 APIs</text><path d="M250 60 H335" class="ln" marker-end="url(#ah6)"/><path d="M605 60 H690" class="ln" marker-end="url(#ah6)"/><rect x="20" y="92" width="230" height="40" rx="6" class="bx "/><text x="135.0" y="116.0" class="lbl" text-anchor="middle">AWS LB controller pod</text><rect x="335" y="92" width="270" height="40" rx="6" class="bx "/><text x="470.0" y="108.5" class="lbl" text-anchor="middle">IRSA role</text><text x="470.0" y="123.5" class="sub" text-anchor="middle">OIDC web identity</text><rect x="690" y="92" width="190" height="40" rx="6" class="bx "/><text x="785.0" y="116.0" class="lbl" text-anchor="middle">Load balancer APIs</text><path d="M250 112 H335" class="ln" marker-end="url(#ah6)"/><path d="M605 112 H690" class="ln" marker-end="url(#ah6)"/><rect x="20" y="144" width="230" height="40" rx="6" class="bx "/><text x="135.0" y="168.0" class="lbl" text-anchor="middle">EBS CSI driver pod</text><rect x="335" y="144" width="270" height="40" rx="6" class="bx "/><text x="470.0" y="160.5" class="lbl" text-anchor="middle">IRSA role</text><text x="470.0" y="175.5" class="sub" text-anchor="middle">OIDC web identity</text><rect x="690" y="144" width="190" height="40" rx="6" class="bx "/><text x="785.0" y="168.0" class="lbl" text-anchor="middle">EBS volume APIs</text><path d="M250 164 H335" class="ln" marker-end="url(#ah6)"/><path d="M605 164 H690" class="ln" marker-end="url(#ah6)"/><rect x="20" y="196" width="230" height="40" rx="6" class="bx "/><text x="135.0" y="220.0" class="lbl" text-anchor="middle">Jenkins build pod</text><rect x="335" y="196" width="270" height="40" rx="6" class="bx acc"/><text x="470.0" y="212.5" class="lbl" text-anchor="middle">Node role</text><text x="470.0" y="227.5" class="sub" text-anchor="middle">auto-refreshing, SCP-excluded</text><rect x="690" y="196" width="190" height="40" rx="6" class="bx "/><text x="785.0" y="220.0" class="lbl" text-anchor="middle">ECR push</text><path d="M250 216 H335" class="ln" marker-end="url(#ah6)"/><path d="M605 216 H690" class="ln" marker-end="url(#ah6)"/><rect x="20" y="248" width="230" height="40" rx="6" class="bx "/><text x="135.0" y="272.0" class="lbl" text-anchor="middle">Jenkins pipeline</text><rect x="335" y="248" width="270" height="40" rx="6" class="bx "/><text x="470.0" y="264.5" class="lbl" text-anchor="middle">GitHub PAT</text><text x="470.0" y="279.5" class="sub" text-anchor="middle">Jenkins credential github-token</text><rect x="690" y="248" width="190" height="40" rx="6" class="bx "/><text x="785.0" y="272.0" class="lbl" text-anchor="middle">GitHub repos</text><path d="M250 268 H335" class="ln" marker-end="url(#ah6)"/><path d="M605 268 H690" class="ln" marker-end="url(#ah6)"/><rect x="20" y="306" width="860" height="34" rx="6" class="bx warn"/><text x="450.0" y="327.0" class="lbl" text-anchor="middle">SCP guardrail in the management account: denies eks:* and ecr:* except for excluded principals</text></svg></div><figcaption>No static keys anywhere. The highlighted row is the one that removed the SSO-expiry problem for CI.</figcaption></figure>
+</section>
+
+<section id="s5">
+<h2><span class="n">5</span>Terraform remote state</h2>
+<p>State lives in S3 with versioning and native lockfile locking, so no DynamoDB table is needed (Terraform 1.10 or later).</p>
+<div class="code"><span class="clabel">bash</span><pre><code>BUCKET=ct-eks-canary-tfstate-821410798987
+aws s3api create-bucket --bucket $BUCKET --region ap-south-1 \
+  --create-bucket-configuration LocationConstraint=ap-south-1
+aws s3api put-bucket-versioning --bucket $BUCKET --versioning-configuration Status=Enabled</code></pre></div>
+<p><code>setup-tf-backend.sh</code> performs these two calls and also writes <code>backend.tf</code>:</p>
+<div class="code"><span class="clabel">backend.tf</span><pre><code>terraform {
+  backend "s3" {
+    bucket       = "ct-eks-canary-tfstate-821410798987"
+    key          = "eks-canary-practice/terraform.tfstate"
+    region       = "ap-south-1"
+    encrypt      = true
+    use_lockfile = true   # native S3 locking, no DynamoDB
+  }
+}</code></pre></div><div class="code"><span class="clabel">bash</span><pre><code>cd terraform
+terraform init -migrate-state</code></pre></div>
+</section>
+
+<section id="s6">
+<h2><span class="n">6</span>Infrastructure</h2>
+
+<h3><span class="n">6.1</span>Key variables</h3>
+<div class="code"><span class="clabel">variables.tf</span><pre><code>region              = "ap-south-1"
+cluster_name        = "eks-canary-practice"
+cluster_version     = "1.34"          # bumped to 1.35 in section 12
+node_instance_types = ["t3.medium"]
+node_capacity_type  = "SPOT"
+node_min_size = 2   node_max_size = 4   node_desired_size = 2</code></pre></div>
+<h3><span class="n">6.2</span>Topology</h3>
+<figure class="diagram"><div class="scroll"><svg viewBox="0 0 900 470" style="min-width:700px" role="img" aria-label="AWS infrastructure provisioned by Terraform"><defs><marker id="ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ahead"/></marker></defs><rect x="10" y="10" width="880" height="450" rx="10" class="grp"/><text x="20" y="26" class="gl" text-anchor="start">AWS account 821410798987 · ap-south-1</text><rect x="30" y="45" width="620" height="395" rx="10" class="grp"/><text x="40" y="61" class="gl" text-anchor="start">VPC 10.0.0.0/16</text><rect x="255" y="58" width="140" height="28" rx="6" class="bx "/><text x="325.0" y="76.0" class="lbl" text-anchor="middle">Internet Gateway</text><rect x="50" y="100" width="280" height="110" rx="10" class="grp"/><text x="320" y="116" class="gl" text-anchor="end">Public subnet · AZ a</text><rect x="70" y="135" width="120" height="50" rx="6" class="bx "/><text x="130.0" y="156.5" class="lbl" text-anchor="middle">NAT gateway</text><text x="130.0" y="171.5" class="sub" text-anchor="middle">+ Elastic IP</text><rect x="350" y="100" width="280" height="110" rx="10" class="grp"/><text x="620" y="116" class="gl" text-anchor="end">Public subnet · AZ b</text><rect x="370" y="135" width="140" height="50" rx="6" class="bx "/><text x="440.0" y="156.5" class="lbl" text-anchor="middle">NLB</text><text x="440.0" y="171.5" class="sub" text-anchor="middle">internet-facing</text><rect x="50" y="245" width="280" height="175" rx="10" class="grp"/><text x="320" y="261" class="gl" text-anchor="end">Private subnet · AZ a</text><rect x="70" y="285" width="240" height="60" rx="6" class="bx acc"/><text x="190.0" y="311.5" class="lbl" text-anchor="middle">Managed node</text><text x="190.0" y="326.5" class="sub" text-anchor="middle">t3.medium Spot · AL2023</text><rect x="350" y="245" width="280" height="175" rx="10" class="grp"/><text x="620" y="261" class="gl" text-anchor="end">Private subnet · AZ b</text><rect x="370" y="285" width="240" height="60" rx="6" class="bx acc"/><text x="490.0" y="311.5" class="lbl" text-anchor="middle">Managed node</text><text x="490.0" y="326.5" class="sub" text-anchor="middle">t3.medium Spot · AL2023</text><text x="50" y="434" class="sub" text-anchor="start">Both private route tables send 0.0.0.0/0 to the single NAT gateway.</text><path d="M130 285 V185" class="ln d" marker-end="url(#ah2)"/><path d="M130 135 V72 H255" class="ln" marker-end="url(#ah2)"/><path d="M440 135 V72 H395" class="ln" marker-end="url(#ah2)"/><path d="M325 58 V28" class="ln" marker-end="url(#ah2)"/><text x="333" y="40" class="sub" text-anchor="start">internet</text><rect x="675" y="60" width="205" height="70" rx="6" class="bx acc"/><text x="777.5" y="84.0" class="lbl" text-anchor="middle">EKS control plane v1.35</text><text x="777.5" y="99.0" class="sub" text-anchor="middle">AWS-managed, HA</text><text x="777.5" y="114.0" class="sub" text-anchor="middle">OIDC provider for IRSA</text><rect x="675" y="145" width="205" height="50" rx="6" class="bx "/><text x="777.5" y="166.5" class="lbl" text-anchor="middle">ECR repository</text><text x="777.5" y="181.5" class="sub" text-anchor="middle">podinfo · keep last 10</text><rect x="675" y="210" width="205" height="130" rx="6" class="bx "/><text x="687" y="230" class="lbl" text-anchor="start">IAM roles</text><text x="687" y="248" class="sub" text-anchor="start">Cluster role</text><text x="687" y="263" class="sub" text-anchor="start">Node role + ECR push policy</text><text x="687" y="278" class="sub" text-anchor="start">IRSA: LB controller</text><text x="687" y="293" class="sub" text-anchor="start">IRSA: EBS CSI driver</text><text x="687" y="308" class="sub" text-anchor="start">IRSA: Jenkins (reserved)</text><rect x="675" y="355" width="205" height="70" rx="6" class="bx "/><text x="777.5" y="379.0" class="lbl" text-anchor="middle">S3 state bucket</text><text x="777.5" y="394.0" class="sub" text-anchor="middle">versioned</text><text x="777.5" y="409.0" class="sub" text-anchor="middle">native lockfile</text><path d="M675 95 H655 V315 H610" class="ln d" marker-end="url(#ah2)"/></svg></div><figcaption>Topology of what Terraform creates. The dashed line is the node-to-control-plane channel; the NLB is created later by the NGINX Service.</figcaption></figure>
+<h3><span class="n">6.3</span>What each file creates</h3>
+<p>About 65 resources in total. KMS secret encryption is off (<code>create_kms_key = false</code>), a decision recorded in section 16.</p>
+<div class="tablewrap"><table class=""><thead><tr><th>File</th><th>Creates</th></tr></thead><tbody><tr><td><code>vpc.tf</code></td><td>VPC 10.0.0.0/16, two public and two private subnets, one NAT gateway, Internet Gateway, EKS and ALB discovery tags</td></tr><tr><td><code>eks.tf</code></td><td>Cluster with public endpoint and OIDC. Managed node group (AL2023, t3.medium Spot, 33% surge). Add-ons: coredns, kube-proxy, vpc-cni, eks-pod-identity-agent, aws-ebs-csi-driver. Access entries. <code>ecr_push</code> policy on the node group role.</td></tr><tr><td><code>ecr.tf</code></td><td>ECR repository <code>podinfo</code> with scan on push and a keep-last-10 lifecycle</td></tr><tr><td><code>irsa.tf</code></td><td>IRSA role for the AWS Load Balancer Controller</td></tr><tr><td><code>ebs-csi-irsa.tf</code></td><td>IRSA role for the EBS CSI driver</td></tr><tr><td><code>jenkins-irsa.tf</code></td><td>IRSA role for Jenkins, reserved and unused because builds use the node role</td></tr><tr><td><code>node-ecr-push.tf</code></td><td>ECR push policy attached to the node role</td></tr><tr><td><code>versions.tf</code>, <code>providers.tf</code>, <code>variables.tf</code>, <code>data.tf</code>, <code>outputs.tf</code>, <code>backend.tf</code></td><td>Provider pins, variables, data sources, outputs and the S3 backend</td></tr></tbody></table></div>
+<h3><span class="n">6.4</span>Plan and apply</h3>
+<div class="code"><span class="clabel">bash</span><pre><code>terraform plan     # review, about 65 resources
+terraform apply    # about 15 to 20 min for the cluster</code></pre></div>
+<p>A first apply on a restricted account rarely goes through cleanly. The failures met here and their fixes are in <a href="#i-nodegroup">node group CREATE_FAILED</a>, <a href="#i-drift">state drift</a> and <a href="#i-scp">the SCP block</a>.</p>
+
+<h3><span class="n">6.5</span>Connect kubectl and verify</h3>
+<div class="code"><span class="clabel">bash</span><pre><code>aws eks update-kubeconfig --region ap-south-1 --name eks-canary-practice
+kubectl get nodes      # expect 2 Ready
+terraform output       # cluster_endpoint, ecr_repository_url, *_role_arn</code></pre></div>
+</section>
+
+<section id="s7">
+<h2><span class="n">7</span>AWS Load Balancer Controller</h2>
+<p>Terraform created the IRSA role. The controller is installed with Helm against a service account that is created first and annotated with that role.</p>
+<div class="code"><span class="clabel">bash</span><pre><code>cd terraform
+CLUSTER=eks-canary-practice; R=ap-south-1
+LBC_ROLE=$(terraform output -raw lb_controller_role_arn)
+VPC_ID=$(aws eks describe-cluster --name $CLUSTER --region $R \
+  --query 'cluster.resourcesVpcConfig.vpcId' --output text)
+
+kubectl create serviceaccount aws-load-balancer-controller -n kube-system
+kubectl annotate serviceaccount aws-load-balancer-controller -n kube-system \
+  eks.amazonaws.com/role-arn=$LBC_ROLE --overwrite
+
+helm repo add eks https://aws.github.io/eks-charts &amp;&amp; helm repo update
+helm install aws-load-balancer-controller eks/aws-load-balancer-controller \
+  -n kube-system \
+  --set clusterName=$CLUSTER \
+  --set serviceAccount.create=false \
+  --set serviceAccount.name=aws-load-balancer-controller \
+  --set region=$R --set vpcId=$VPC_ID
+
+kubectl -n kube-system rollout status deployment/aws-load-balancer-controller</code></pre></div>
+</section>
+
+<section id="s8">
+<h2><span class="n">8</span>GitOps and Flux</h2>
+<div class="note"><b class="t">Concept</b><p>The Git repo is the single source of truth and Flux continuously reconciles the cluster to match it. Flux watches only the GitOps repo, never the app repo. CI bridges the two by committing an image tag, so Jenkins never runs <code>kubectl apply</code>.</p></div>
+
+<h3><span class="n">8.1</span>Repository structure</h3>
+<p>The <code>eks-canary-gitops</code> repo is laid out like this:</p>
+<div class="code"><span class="clabel">tree</span><pre><code>clusters/practice/     flux-system/ (written by bootstrap), infrastructure.yaml, apps.yaml
+infrastructure/        sources.yaml, nginx.yaml, flagger.yaml, loadtester.yaml, jenkins.yaml, kustomization.yaml
+apps/recharge-system/  namespace, deployment, hpa, canary, traffic-generator, kustomization</code></pre></div>
+<p><code>infrastructure.yaml</code> and <code>apps.yaml</code> are Flux Kustomizations. The apps one depends on infrastructure, so ingress, Flagger and Prometheus exist before the app and its Canary resource are applied.</p>
+
+<h3><span class="n">8.2</span>Push to GitHub</h3>
+<div class="code"><span class="clabel">bash</span><pre><code>cd gitops
+git init &amp;&amp; git add . &amp;&amp; git commit -m "gitops scaffold"
+git branch -M main
+git remote add origin https://github.com/NipurJain4/eks-canary-gitops.git
+git push -u origin main</code></pre></div>
+<h3><span class="n">8.3</span>Bootstrap Flux</h3>
+<p>Bootstrap installs Flux, commits its own manifests into <code>clusters/practice/flux-system/</code> and starts reconciling.</p>
+<div class="code"><span class="clabel">bash</span><pre><code>export GITHUB_TOKEN=&lt;pat-with-repo-scope&gt;
+flux bootstrap github \
+  --owner=NipurJain4 --repository=eks-canary-gitops \
+  --branch=main --path=clusters/practice --personal</code></pre></div>
+<h3><span class="n">8.4</span>Watch convergence</h3>
+<div class="code"><span class="clabel">bash</span><pre><code>flux get kustomizations --watch      # infrastructure, then apps
+flux get helmreleases -A
+kubectl get pods -n ingress-nginx
+kubectl get pods -n flagger-system</code></pre></div>
+<h3><span class="n">8.5</span>Prometheus chart source</h3>
+<p>The <code>flagger</code> Helm repository does not ship a <code>prometheus</code> chart. Use <code>prometheus-community</code> and set a 15 second scrape interval, which the canary metrics depend on (see <a href="#i-canary">the canary rollback issue</a>).</p>
+<div class="code"><span class="clabel">yaml</span><pre><code># sources.yaml: add
+url: https://prometheus-community.github.io/helm-charts
+
+# flagger.yaml: prometheus HelmRelease
+chart: prometheus
+version: "25.x"
+sourceRef: prometheus-community
+server.global.scrape_interval: 15s    # critical for canary metrics</code></pre></div>
+</section>
+
+<section id="s9">
+<h2><span class="n">9</span>The application</h2>
+
+<h3><span class="n">9.1</span>Container image</h3>
+<p>nginx serves the static site and exposes <code>/healthz</code> for the probes. <code>nginx.conf</code> adds <code>location = /healthz { return 200 'OK'; }</code>.</p>
+<div class="code"><span class="clabel">Dockerfile</span><pre><code>FROM nginx:1.27-alpine
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY index.html /usr/share/nginx/html/index.html
+COPY images/ /usr/share/nginx/html/images/
+EXPOSE 80</code></pre></div>
+<h3><span class="n">9.2</span>First build and push</h3>
+<p>The first image is pushed by hand. The existing ECR repository <code>podinfo</code> is reused, with the app identified by its tag.</p>
+<div class="code"><span class="clabel">bash</span><pre><code>R=ap-south-1; REGISTRY=821410798987.dkr.ecr.$R.amazonaws.com
+aws ecr get-login-password --region $R | docker login --username AWS --password-stdin $REGISTRY
+docker build -t $REGISTRY/podinfo:recharge-v1.0.0 .
+docker push $REGISTRY/podinfo:recharge-v1.0.0</code></pre></div>
+<h3><span class="n">9.3</span>Manifests</h3>
+<p>Under <code>apps/recharge-system/</code>:</p>
+<ul>
+<li><code>deployment.yaml</code>: image <code>podinfo:recharge-v1.0.0</code>, port 80, <code>/healthz</code> probes. It sets no replica count because Flagger manages it.</li>
+<li><code>hpa.yaml</code>: minimum 2, maximum 4.</li>
+<li><code>canary.yaml</code>: MetricTemplate, Canary and Ingress, described in section 10.</li>
+<li><code>traffic-generator.yaml</code>: an always-on curl loop that keeps metrics steady.</li>
+</ul>
+<p>After commit and push, Flux deploys the files and Flagger initializes. The sign of success is a <code>recharge-system-primary</code> deployment appearing.</p>
+
+<h3><span class="n">9.4</span>Reaching the app from a browser</h3>
+<p>The NGINX Service creates the NLB, which is internal by default. Two annotations on the controller Service make it public:</p>
+<div class="code"><span class="clabel">yaml</span><pre><code># infrastructure/nginx.yaml, controller.service.annotations
+service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"</code></pre></div><figure class="diagram"><div class="scroll"><svg viewBox="0 0 900 170" style="min-width:680px" role="img" aria-label="Request path from browser to pods"><defs><marker id="ah7" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ahead"/></marker></defs><rect x="10" y="50" width="170" height="60" rx="6" class="bx "/><text x="95.0" y="76.5" class="lbl" text-anchor="middle">Browser</text><text x="95.0" y="91.5" class="sub" text-anchor="middle">Host: recharge.example.com</text><rect x="215" y="50" width="150" height="60" rx="6" class="bx "/><text x="290.0" y="76.5" class="lbl" text-anchor="middle">NLB</text><text x="290.0" y="91.5" class="sub" text-anchor="middle">internet-facing</text><rect x="400" y="50" width="170" height="60" rx="6" class="bx "/><text x="485.0" y="76.5" class="lbl" text-anchor="middle">NGINX ingress</text><text x="485.0" y="91.5" class="sub" text-anchor="middle">weighted split by Flagger</text><rect x="630" y="15" width="250" height="50" rx="6" class="bx "/><text x="755.0" y="36.5" class="lbl" text-anchor="middle">recharge-system-primary</text><text x="755.0" y="51.5" class="sub" text-anchor="middle">Service → primary pods</text><rect x="630" y="105" width="250" height="50" rx="6" class="bx warn"/><text x="755.0" y="126.5" class="lbl" text-anchor="middle">recharge-system-canary</text><text x="755.0" y="141.5" class="sub" text-anchor="middle">Service → canary pods (rollout only)</text><path d="M180 80 H215" class="ln" marker-end="url(#ah7)"/><path d="M365 80 H400" class="ln" marker-end="url(#ah7)"/><path d="M570 68 L630 42" class="ln" marker-end="url(#ah7)"/><text x="580" y="38" class="sub" text-anchor="middle">100 − w %</text><path d="M570 92 L630 128" class="ln" marker-end="url(#ah7)"/><text x="580" y="132" class="sub" text-anchor="middle">w %</text></svg></div><figcaption>w is the canary weight Flagger sets during a rollout, 10% to 50%.</figcaption></figure>
+<p>Flagger's NGINX canary needs a host on the ingress, so the ingress uses <code>recharge.example.com</code>, which has no real DNS. Pick one way to browse:</p>
+<ul>
+<li>Add <code>&lt;NLB_IP&gt; recharge.example.com</code> to the hosts file of the machine that runs the browser.</li>
+<li>Port-forward the primary service: <code>kubectl port-forward -n recharge-system svc/recharge-system-primary 8080:80</code>.</li>
+</ul>
+<p>In production the host would be a Route 53 record pointing at the NLB. See <a href="#i-host">the host and DNS issue</a> for why the host cannot simply be dropped.</p>
+</section>
+
+<section id="s10">
+<h2><span class="n">10</span>Canary with Flagger</h2>
+<div class="note"><b class="t">Concept</b><p>Flagger creates a <code>-primary</code> copy of the Deployment, shifts traffic in weighted steps through NGINX, gates each step on Prometheus metrics, then promotes or rolls back on its own. It needs three things to work: a traffic router (NGINX), metrics (Prometheus) and traffic (the loadtester and traffic-generator).</p></div>
+<figure class="diagram"><div class="scroll"><svg viewBox="0 0 900 330" style="min-width:700px" role="img" aria-label="Flagger canary decision flow"><defs><marker id="ah4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ahead"/></marker></defs><rect x="20" y="120" width="120" height="64" rx="6" class="bx "/><text x="80.0" y="141.0" class="lbl" text-anchor="middle">Tag committed</text><text x="80.0" y="156.0" class="sub" text-anchor="middle">Flux applies</text><text x="80.0" y="171.0" class="sub" text-anchor="middle">the Deployment</text><rect x="165" y="120" width="140" height="64" rx="6" class="bx "/><text x="235.0" y="141.0" class="lbl" text-anchor="middle">Flagger detects</text><text x="235.0" y="156.0" class="sub" text-anchor="middle">the change, scales</text><text x="235.0" y="171.0" class="sub" text-anchor="middle">up canary pods</text><polygon points="410,100 500,152 410,204 320,152" class="bx acc"/><text x="410" y="149" class="lbl" text-anchor="middle">error rate</text><text x="410" y="165" class="sub" text-anchor="middle">&lt; 5% ?</text><rect x="555" y="120" width="130" height="64" rx="6" class="bx "/><text x="620.0" y="141.0" class="lbl" text-anchor="middle">Yes: weight +10%</text><text x="620.0" y="156.0" class="sub" text-anchor="middle">10 → 20 … 50%</text><text x="620.0" y="171.0" class="sub" text-anchor="middle">check every 30 s</text><rect x="730" y="120" width="150" height="64" rx="6" class="bx acc"/><text x="805.0" y="141.0" class="lbl" text-anchor="middle">Promote</text><text x="805.0" y="156.0" class="sub" text-anchor="middle">canary → primary</text><text x="805.0" y="171.0" class="sub" text-anchor="middle">100% traffic to primary</text><rect x="335" y="250" width="150" height="56" rx="6" class="bx warn"/><text x="410.0" y="267.0" class="lbl" text-anchor="middle">Rollback</text><text x="410.0" y="282.0" class="sub" text-anchor="middle">after 5 failed checks</text><text x="410.0" y="297.0" class="sub" text-anchor="middle">traffic back to primary</text><rect x="560" y="240" width="320" height="70" rx="6" class="bx "/><text x="720.0" y="264.0" class="lbl" text-anchor="middle">Metric inputs</text><text x="720.0" y="279.0" class="sub" text-anchor="middle">traffic-generator + loadtester → NGINX</text><text x="720.0" y="294.0" class="sub" text-anchor="middle">Prometheus scrapes every 15 s</text><path d="M140 152 H165" class="ln" marker-end="url(#ah4)"/><path d="M305 152 H320" class="ln" marker-end="url(#ah4)"/><path d="M500 152 H555" class="ln" marker-end="url(#ah4)"/><text x="527" y="144" class="sub" text-anchor="middle">yes</text><path d="M685 152 H730" class="ln" marker-end="url(#ah4)"/><text x="707" y="144" class="sub" text-anchor="middle">at 50%</text><path d="M620 120 V80 H410 V100" class="ln d a" marker-end="url(#ah4)"/><text x="515" y="72" class="sub" text-anchor="middle">repeat while weight &lt; 50%</text><path d="M410 204 V250" class="ln" marker-end="url(#ah4)"/><text x="418" y="232" class="sub" text-anchor="start">no</text><path d="M560 268 L470 178" class="ln d" marker-end="url(#ah4)"/></svg></div><figcaption>One canary run. The dashed line from the metric inputs feeds the success-rate check.</figcaption></figure>
+<p>Without steady traffic, <code>rate()</code> over a one-minute window has too few samples and the metric comes back empty, which Flagger reads as a failure. That is why the lab runs an always-on traffic source.</p>
+
+<h3><span class="n">10.1</span>Custom metric template</h3>
+<p>Flagger's built-in NGINX query filters on <code>exported_namespace</code>, but this cluster's metrics carry <code>namespace</code>. The custom query below uses the right label and returns 0% error when there is no traffic, instead of NaN.</p>
+<div class="code"><span class="clabel">MetricTemplate query</span><pre><code>100 - (
+  sum(rate(nginx_ingress_controller_requests{namespace="{{namespace}}",ingress="{{target}}",status!~"5.."}[{{interval}}]))
+  /
+  sum(rate(nginx_ingress_controller_requests{namespace="{{namespace}}",ingress="{{target}}"}[{{interval}}]))
+  * 100
+) or on() vector(0)</code></pre></div>
+<h3><span class="n">10.2</span>Canary spec</h3>
+<div class="code"><span class="clabel">canary.yaml</span><pre><code>analysis:
+  interval: 30s
+  threshold: 5
+  maxWeight: 50
+  stepWeight: 10
+  metrics:
+    - name: nginx-success-rate          # templateRef to the custom template
+      thresholdRange: { max: 5 }
+      interval: 1m
+  webhooks:
+    - name: load-test                   # continuous: hey -z 5m -q 50 -c 10 through the ingress</code></pre></div><div class="tablewrap"><table class=""><thead><tr><th>Setting</th><th>Value</th><th>Meaning</th></tr></thead><tbody><tr><td><code>stepWeight</code></td><td>10</td><td>Traffic added to the canary at each step</td></tr><tr><td><code>maxWeight</code></td><td>50</td><td>Weight reached before promotion</td></tr><tr><td><code>interval</code></td><td>30s</td><td>How often Flagger evaluates</td></tr><tr><td><code>threshold</code></td><td>5</td><td>Failed checks tolerated before rollback</td></tr><tr><td><code>thresholdRange.max</code></td><td>5</td><td>Maximum error rate in percent, relaxed from the default to absorb low-traffic noise</td></tr></tbody></table></div>
+<h3><span class="n">10.3</span>Trigger a canary</h3>
+<p>Bump the image tag in the GitOps <code>deployment.yaml</code> and push, or patch the Deployment directly for a quick test:</p>
+<div class="code"><span class="clabel">bash</span><pre><code>kubectl -n recharge-system set image deployment/recharge-system recharge-system=&lt;new-tag&gt;
+kubectl -n recharge-system get canary recharge-system -w
+# phases: Initialized, Progressing (10 to 50), Promoting, Succeeded</code></pre></div>
+<p>A deliberately bad version shows the other path: after five failed checks the status becomes <code>Failed</code> and all traffic returns to the primary.</p>
+</section>
+
+<section id="s11">
+<h2><span class="n">11</span>CI with Jenkins</h2>
+<p>Jenkins runs inside the cluster. Build pods authenticate to ECR with the node role, so there are no stored keys and nothing that expires hourly.</p>
+
+<h3><span class="n">11.1</span>Storage prerequisite: EBS CSI</h3>
+<p>Jenkins needs a persistent volume. From EKS 1.34 the in-tree EBS provisioner is gone, so the EBS CSI add-on and a CSI-based default StorageClass are required (<a href="#i-pvc">what happens without them</a>).</p>
+<div class="code"><span class="clabel">hcl</span><pre><code># eks.tf, cluster_addons
+aws-ebs-csi-driver = { most_recent = true, service_account_role_arn = module.ebs_csi_irsa.iam_role_arn }</code></pre></div><div class="code"><span class="clabel">bash</span><pre><code>kubectl apply -f - &lt;&lt;EOF
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata: { name: gp3, annotations: { "storageclass.kubernetes.io/is-default-class": "true" } }
+provisioner: ebs.csi.aws.com
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+parameters: { type: gp3 }
+EOF
+kubectl patch storageclass gp2 -p '{"metadata":{"annotations":{"storageclass.kubernetes.io/is-default-class":"false"}}}'</code></pre></div>
+<h3><span class="n">11.2</span>Deploy Jenkins through Flux</h3>
+<p><code>infrastructure/jenkins.yaml</code> is a HelmRelease of the <code>jenkins</code> 5.x chart in namespace <code>jenkins</code>, with agents enabled and an 8 Gi persistent volume.</p>
+
+<h3><span class="n">11.3</span>Admin password and access</h3>
+<div class="code"><span class="clabel">bash</span><pre><code>kubectl get secret jenkins -n jenkins -o jsonpath='{.data.jenkins-admin-password}' | base64 -d
+kubectl port-forward -n jenkins svc/jenkins 8080:8080    # http://localhost:8080  (admin / &lt;password&gt;)</code></pre></div>
+<h3><span class="n">11.4</span>Configure Jenkins</h3>
+<ul>
+<li>Add a credential of kind Secret text with id <code>github-token</code>, holding a GitHub PAT with repo scope.</li>
+<li>Create a pipeline job from &ldquo;Pipeline script from SCM&rdquo;, pointing at the recharge-system repo and its <code>Jenkinsfile</code>.</li>
+<li>Optional auto-trigger: <code>triggers { pollSCM('H/2 * * * *') }</code>.</li>
+</ul>
+
+<h3><span class="n">11.5</span>The pipeline</h3>
+<p>The <code>Jenkinsfile</code> in the app repo has two stages. The first builds with Kaniko, because build pods have no Docker daemon, and pushes to ECR. The second clones the GitOps repo, rewrites the image tag in <code>apps/recharge-system/deployment.yaml</code> with <code>sed</code>, then commits and pushes. Flux and Flagger take over from there.</p>
+<figure class="diagram"><div class="scroll"><svg viewBox="0 0 900 250" style="min-width:700px" role="img" aria-label="CI/CD pipeline from code push to canary"><defs><marker id="ah3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ahead"/></marker></defs><rect x="10" y="75" width="130" height="90" rx="6" class="bx "/><text x="75.0" y="109.0" class="lbl" text-anchor="middle">1 · Push</text><text x="75.0" y="124.0" class="sub" text-anchor="middle">developer commits</text><text x="75.0" y="139.0" class="sub" text-anchor="middle">app code</text><path d="M140 120 H160" class="ln" marker-end="url(#ah3)"/><rect x="160" y="75" width="130" height="90" rx="6" class="bx "/><text x="225.0" y="109.0" class="lbl" text-anchor="middle">2 · Build</text><text x="225.0" y="124.0" class="sub" text-anchor="middle">Kaniko builds the</text><text x="225.0" y="139.0" class="sub" text-anchor="middle">Dockerfile image</text><path d="M290 120 H310" class="ln" marker-end="url(#ah3)"/><rect x="310" y="75" width="130" height="90" rx="6" class="bx "/><text x="375.0" y="109.0" class="lbl" text-anchor="middle">3 · Publish</text><text x="375.0" y="124.0" class="sub" text-anchor="middle">image pushed to ECR</text><text x="375.0" y="139.0" class="sub" text-anchor="middle">(node role auth)</text><path d="M440 120 H460" class="ln" marker-end="url(#ah3)"/><rect x="460" y="75" width="130" height="90" rx="6" class="bx "/><text x="525.0" y="109.0" class="lbl" text-anchor="middle">4 · Commit</text><text x="525.0" y="124.0" class="sub" text-anchor="middle">bumps image tag in</text><text x="525.0" y="139.0" class="sub" text-anchor="middle">the gitops repo</text><path d="M590 120 H610" class="ln" marker-end="url(#ah3)"/><rect x="610" y="75" width="130" height="90" rx="6" class="bx "/><text x="675.0" y="109.0" class="lbl" text-anchor="middle">5 · Reconcile</text><text x="675.0" y="124.0" class="sub" text-anchor="middle">Flux detects the</text><text x="675.0" y="139.0" class="sub" text-anchor="middle">commit and applies</text><path d="M740 120 H760" class="ln" marker-end="url(#ah3)"/><rect x="760" y="75" width="130" height="90" rx="6" class="bx acc"/><text x="825.0" y="109.0" class="lbl" text-anchor="middle">6 · Canary</text><text x="825.0" y="124.0" class="sub" text-anchor="middle">Flagger shifts</text><text x="825.0" y="139.0" class="sub" text-anchor="middle">traffic 10 → 50%</text><path d="M10 58 H140" class="ln a" style="marker-end:none"/><text x="75.0" y="48" class="gl" text-anchor="middle">recharge-system repo</text><path d="M160 58 H590" class="ln a" style="marker-end:none"/><text x="375.0" y="48" class="gl" text-anchor="middle">Jenkins, in the cluster</text><path d="M610 58 H890" class="ln a" style="marker-end:none"/><text x="750.0" y="48" class="gl" text-anchor="middle">Cluster, driven by Git</text><rect x="10" y="190" width="880" height="44" rx="6" class="bx acc"/><text x="450.0" y="216.0" class="lbl" text-anchor="middle">Jenkins only commits to Git. Flux is the only actor that changes the cluster.</text></svg></div><figcaption>The two-repo model. Flux watches the gitops repo only; the image tag commit in step 4 is what connects CI to CD.</figcaption></figure>
+<p>The complete path was verified end to end with a visible change on the page: code push, Jenkins build, ECR, tag commit, Flux, Flagger canary, live.</p>
+</section>
+
+<section id="s12">
+<h2><span class="n">12</span>EKS version upgrade, 1.34 to 1.35</h2>
+<p>EKS allows one minor version at a time. The control plane can run one minor ahead of the nodes and never behind. Nodes are replaced rather than upgraded in place, which is what makes zero downtime possible.</p>
+<figure class="diagram"><div class="scroll"><svg viewBox="0 0 900 250" style="min-width:700px" role="img" aria-label="EKS 1.34 to 1.35 upgrade sequence"><defs><marker id="ah5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ahead"/></marker></defs><rect x="20" y="30" width="250" height="90" rx="6" class="bx "/><text x="145.0" y="64.0" class="lbl" text-anchor="middle">1 · Control plane</text><text x="145.0" y="79.0" class="sub" text-anchor="middle">in place, about 10 min</text><text x="145.0" y="94.0" class="sub" text-anchor="middle">API server 1.35, nodes still 1.34</text><rect x="325" y="30" width="250" height="90" rx="6" class="bx "/><text x="450.0" y="64.0" class="lbl" text-anchor="middle">2 · Add-ons</text><text x="450.0" y="79.0" class="sub" text-anchor="middle">coredns, kube-proxy, vpc-cni,</text><text x="450.0" y="94.0" class="sub" text-anchor="middle">pod-identity-agent, EBS CSI → 1.35</text><rect x="630" y="30" width="250" height="90" rx="6" class="bx acc"/><text x="755.0" y="64.0" class="lbl" text-anchor="middle">3 · Node group</text><text x="755.0" y="79.0" class="sub" text-anchor="middle">rolling replacement, about 15 min</text><text x="755.0" y="94.0" class="sub" text-anchor="middle">max unavailable 33%</text><path d="M270 75 H325" class="ln" marker-end="url(#ah5)"/><path d="M575 75 H630" class="ln" marker-end="url(#ah5)"/><text x="330" y="156" class="sub" text-anchor="start">For each old 1.34 node</text><rect x="330" y="172" width="125" height="56" rx="6" class="bx "/><text x="392.5" y="189.0" class="lbl" text-anchor="middle">a · Surge</text><text x="392.5" y="204.0" class="sub" text-anchor="middle">launch a new</text><text x="392.5" y="219.0" class="sub" text-anchor="middle">1.35 node</text><path d="M455 200 H467" class="ln" marker-end="url(#ah5)"/><rect x="467" y="172" width="125" height="56" rx="6" class="bx "/><text x="529.5" y="189.0" class="lbl" text-anchor="middle">b · Cordon</text><text x="529.5" y="204.0" class="sub" text-anchor="middle">old node stops</text><text x="529.5" y="219.0" class="sub" text-anchor="middle">taking new pods</text><path d="M592 200 H604" class="ln" marker-end="url(#ah5)"/><rect x="604" y="172" width="125" height="56" rx="6" class="bx "/><text x="666.5" y="189.0" class="lbl" text-anchor="middle">c · Drain</text><text x="666.5" y="204.0" class="sub" text-anchor="middle">evict pods, they</text><text x="666.5" y="219.0" class="sub" text-anchor="middle">reschedule on 1.35</text><path d="M729 200 H741" class="ln" marker-end="url(#ah5)"/><rect x="741" y="172" width="125" height="56" rx="6" class="bx "/><text x="803.5" y="189.0" class="lbl" text-anchor="middle">d · Terminate</text><text x="803.5" y="204.0" class="sub" text-anchor="middle">remove the old</text><text x="803.5" y="219.0" class="sub" text-anchor="middle">1.34 node</text><path d="M800 120 V172" class="ln d" marker-end="url(#ah5)"/><rect x="20" y="172" width="285" height="56" rx="6" class="bx warn"/><text x="162.5" y="189.0" class="lbl" text-anchor="middle">Order rule</text><text x="162.5" y="204.0" class="sub" text-anchor="middle">control plane → add-ons → nodes</text><text x="162.5" y="219.0" class="sub" text-anchor="middle">nodes never run ahead of the control plane</text></svg></div><figcaption>Nodes are replaced, never upgraded in place. Two replicas plus a 33% surge keep the app serving throughout.</figcaption></figure>
+<h3><span class="n">12.1</span>Pre-flight</h3>
+<div class="code"><span class="clabel">bash</span><pre><code>aws eks describe-cluster --name eks-canary-practice --region ap-south-1 --query 'cluster.version'
+kubectl get nodes
+aws eks describe-cluster-versions --region ap-south-1 \
+  --query 'clusterVersions[].clusterVersion' --output text      # confirm 1.35 is available
+kubectl get pods -A | grep -vE "Running|Completed"              # baseline should be empty</code></pre></div>
+<h3><span class="n">12.2</span>Upgrade</h3>
+<p>Change <code>cluster_version</code> from <code>"1.34"</code> to <code>"1.35"</code> in <code>terraform/variables.tf</code>. The add-ons use <code>most_recent = true</code>, so they move to 1.35-compatible versions in the same apply.</p>
+<div class="code"><span class="clabel">bash</span><pre><code>cd terraform
+terraform plan     # expect only "updated in-place": cluster, node group, add-ons
+terraform apply    # about 25 to 30 min in total</code></pre></div>
+<h3><span class="n">12.3</span>Watch from a second terminal</h3>
+<div class="code"><span class="clabel">bash</span><pre><code>kubectl get nodes -w                      # old 1.34 nodes drain, new 1.35 nodes join
+kubectl get pods -n recharge-system -w    # the app stays up
+aws eks describe-cluster --name eks-canary-practice --region ap-south-1 --query 'cluster.version'</code></pre></div>
+<h3><span class="n">12.4</span>Verify</h3>
+<div class="code"><span class="clabel">bash</span><pre><code>kubectl get nodes                                         # all v1.35.x
+kubectl get pods -A | grep -vE "Running|Completed"        # nothing broken</code></pre></div>
+</section>
+
+<section id="s13">
+<h2><span class="n">13</span>Results and cost</h2>
+<h3><span class="n">13.1</span>Verified final state</h3>
+<div class="tablewrap"><table class=""><thead><tr><th>Area</th><th>State</th></tr></thead><tbody><tr><td>Control plane</td><td>Kubernetes <b>1.35</b></td></tr><tr><td>Nodes</td><td>2× v1.35.8, Ready</td></tr><tr><td>Workloads</td><td>recharge-system (primary ×2), traffic-generator, Jenkins, Flagger, Prometheus, NGINX, all Running</td></tr><tr><td>Canary</td><td><span class="badge">Succeeded</span> promotion verified</td></tr><tr><td>Upgrade</td><td>Zero downtime: the app served requests through the roughly 25 minute node roll</td></tr><tr><td>CI/CD</td><td>Jenkins → ECR → GitOps → Flux → Flagger, verified end to end with live visible changes</td></tr></tbody></table></div>
+<h3><span class="n">13.2</span>Cost</h3>
+<p>The running rate is about <b>$0.22 per hour</b>. The whole proof of concept stayed well under roughly $15 because the stack was destroyed between sessions.</p>
+<div class="tablewrap"><table class=""><thead><tr><th>Item</th><th>Approx. per hour</th></tr></thead><tbody><tr><td>EKS control plane</td><td>$0.100</td></tr><tr><td>2× t3.medium Spot</td><td>$0.056</td></tr><tr><td>NAT gateway</td><td>$0.045</td></tr><tr><td>NLB</td><td>$0.016</td></tr><tr><td><b>Total</b></td><td><b>≈ $0.22</b></td></tr></tbody></table></div>
+<p>The S3 state bucket costs a few cents a month and is kept so the stack can be rebuilt.</p>
+</section>
+
+<section id="s14">
+<h2><span class="n">14</span>Teardown and rebuild</h2>
+<h3><span class="n">14.1</span>Scripts</h3>
+<div class="tablewrap"><table class=""><thead><tr><th>Script</th><th>What it does</th></tr></thead><tbody><tr><td><code>setup-tf-backend.sh</code></td><td>Creates the S3 state bucket with versioning and native locking, and writes <code>backend.tf</code></td></tr><tr><td><code>resume.sh</code></td><td>Full rebuild: terraform apply, kubectl, build and push image, LB controller, Flux bootstrap. Flux then deploys everything else.</td></tr><tr><td><code>teardown.sh</code></td><td>Safe destroy, in the order below</td></tr><tr><td><code>missing-permissions-policy.json</code></td><td>IAM and SCP permissions to request from an administrator</td></tr></tbody></table></div>
+<h3><span class="n">14.2</span>Teardown</h3>
+<p>Order matters. If the NLB is still alive when Terraform tries to delete the VPC, the destroy hangs on leftover network interfaces.</p>
+<div class="code"><span class="clabel">bash</span><pre><code>cd /home/nipurjain/canary_p
+./teardown.sh
+# delete nginx Service (removes the NLB) → suspend Flux → uninstall LB controller
+# → wait 60 s → terraform destroy</code></pre></div>
+<p>Mid-destroy failures and their fixes are collected in <a href="#i-lock">stale state lock</a>, <a href="#i-ecr">ECR not empty</a> and <a href="#i-eip">leftover Elastic IP</a>.</p>
+
+<h3><span class="n">14.3</span>Verify nothing billable is left</h3>
+<div class="code"><span class="clabel">bash</span><pre><code>R=ap-south-1
+aws eks list-clusters --region $R
+aws ec2 describe-nat-gateways --region $R --filter Name=state,Values=available
+aws ec2 describe-instances --region $R --filters Name=instance-state-name,Values=running
+aws elbv2 describe-load-balancers --region $R
+aws ec2 describe-addresses --region $R
+aws ecr describe-repositories --region $R
+# every call should return an empty list</code></pre></div>
+<h3><span class="n">14.4</span>Rebuild any time</h3>
+<div class="code"><span class="clabel">bash</span><pre><code>aws sso login
+export GITHUB_TOKEN=&lt;pat&gt;
+./resume.sh</code></pre></div>
+</section>
+<section id="s15"><h2><span class="n">15</span>Problems and fixes</h2><p>Grouped by area, with the symptom to look for, the cause and the fix. Commands appear here and in the section that introduces them.</p><h3>Access and policy</h3><div class="issues"><article class="issue"><h4 id="i-scp">SCP blocks EKS and ECR<span class="tag">recurring</span></h4><dl><dt>Symptom</dt><dd><p>Calls fail with <i>explicit deny in a service control policy</i>. Plain IAM gaps read <i>no identity-based policy allows</i> instead, which is how the two are told apart.</p></dd><dt>Cause</dt><dd><p>Org SCP <code>p-jqf3wzw9</code>, in management account <code>775267928995</code>, denies <code>eks:*</code> and <code>ecr:*</code>. IAM cannot override it. It returned for each new principal: first the user role, then the node role, and it would have for a Jenkins role.</p></dd><dt>Fix</dt><dd><p>The administrator adds exclusions with <code>NotLike</code> conditions on <code>aws:userid</code> and <code>aws:PrincipalArn</code>. Use wildcard patterns so rebuilds stay covered.</p></dd></dl></article><article class="issue"><h4 id="i-iam">Missing companion IAM actions<span class="tag">IAM</span></h4><dl><dt>Symptom</dt><dd><p><code>terraform apply</code> failed one action at a time.</p></dd><dt>Cause</dt><dd><p>The role could create resources but lacked tag and describe actions such as <code>iam:TagPolicy</code>, <code>logs:PutRetentionPolicy</code>, <code>ec2:DescribeVpcAttribute</code> and <code>ecr:SetRepositoryPolicy</code>.</p></dd><dt>Fix</dt><dd><p>The administrator added them in batches. The full set is recorded in <code>missing-permissions-policy.json</code>.</p></dd></dl></article><article class="issue"><h4 id="i-passrole">iam:PassRole denied for the node group<span class="tag">IAM</span></h4><dl><dt>Symptom</dt><dd><p>Node group creation was rejected on <code>iam:PassRole</code>.</p></dd><dt>Cause</dt><dd><p>Creating a node group hands the node role to EKS. The original policy still had the unresolved <code>&lt;ACCOUNT_ID&gt;</code> placeholder in its PassRole statement.</p></dd><dt>Fix</dt><dd><p>The administrator granted a scoped <code>iam:PassRole</code> for the node role.</p></dd></dl></article><article class="issue"><h4 id="i-scp-expiry">SCP exclusion expired between sessions<span class="tag">SCP</span></h4><dl><dt>Symptom</dt><dd><p>Resuming after a pause failed with SCP denies again.</p></dd><dt>Cause</dt><dd><p>The exclusion had been granted only until the 18th and was removed while the lab was paused.</p></dd><dt>Fix</dt><dd><p>A ticket (with Rutvik's approval) re-granted it for two more days. The request included the node and <code>eks-*</code> role patterns so rebuilds were covered.</p></dd></dl></article><article class="issue"><h4 id="i-sso">SSO token expiry and shell mismatch<span class="tag">environment</span></h4><dl><dt>Symptom</dt><dd><p><code>ExpiredToken</code> roughly every hour. Under WSL, the agent shell and the interactive terminal also disagreed about the refreshed token and about public DNS.</p></dd><dt>Cause</dt><dd><p>SSO credentials are temporary. The two shells did not share the refreshed token.</p></dd><dt>Fix</dt><dd><p>Re-run the login and refresh the kubeconfig. Run long operations in the terminal where credentials are live.</p><div class="code"><span class="clabel">bash</span><pre><code>aws sso login
+aws eks update-kubeconfig --region ap-south-1 --name eks-canary-practice</code></pre></div></dd></dl></article></div><h3>Terraform state and apply</h3><div class="issues"><article class="issue"><h4 id="i-nodegroup">Node group CREATE_FAILED<span class="tag">terraform</span></h4><dl><dt>Symptom</dt><dd><p><code>NodeCreationFailure: Unhealthy nodes</code>. The <code>aws-node</code> (CNI) and <code>kube-proxy</code> pods sat in <code>ImagePullBackOff</code> with <i>no basic auth credentials</i>.</p></dd><dt>Cause</dt><dd><p>The node role is a separate principal and was still SCP-blocked from <code>ecr:GetAuthorizationToken</code>, so nodes could not pull the EKS system images.</p></dd><dt>Fix</dt><dd><p>Extend the SCP exclusion to <code>role/default-eks-node-group-*</code>, remove the failed group, clean state and apply again.</p><div class="code"><span class="clabel">bash</span><pre><code>aws eks delete-nodegroup --cluster-name eks-canary-practice --nodegroup-name &lt;ng&gt; --region ap-south-1
+terraform state rm 'module.eks.module.eks_managed_node_group["default"].aws_eks_node_group.this[0]'
+terraform apply</code></pre></div></dd></dl></article><article class="issue"><h4 id="i-drift">State drift after a partial apply<span class="tag">terraform</span></h4><dl><dt>Symptom</dt><dd><p>Re-apply reports that the ECR repository or the CloudWatch log group already exists.</p></dd><dt>Cause</dt><dd><p>A failed apply left real resources that were never written to state.</p></dd><dt>Fix</dt><dd><p>Adopt them into state, and use <code>state rm</code> where an object must be forgotten.</p><div class="code"><span class="clabel">bash</span><pre><code>terraform import 'module.eks.aws_cloudwatch_log_group.this[0]' /aws/eks/eks-canary-practice/cluster
+terraform import 'module.ecr.aws_ecr_repository.this[0]' podinfo</code></pre></div></dd></dl></article><article class="issue"><h4 id="i-lock">Stale state lock<span class="tag">terraform</span></h4><dl><dt>Symptom</dt><dd><p><code>Error acquiring the state lock</code>.</p></dd><dt>Cause</dt><dd><p>A previous run died when the SSO token expired mid-destroy.</p></dd><dt>Fix</dt><dd><div class="code"><span class="clabel">bash</span><pre><code>terraform force-unlock -force &lt;LOCK_ID&gt;</code></pre></div></dd></dl></article><article class="issue"><h4 id="i-ecr">ECR repository not empty on destroy<span class="tag">teardown</span></h4><dl><dt>Symptom</dt><dd><p><code>RepositoryNotEmptyException</code>.</p></dd><dt>Cause</dt><dd><p>The repository still holds images.</p></dd><dt>Fix</dt><dd><div class="code"><span class="clabel">bash</span><pre><code>aws ecr delete-repository --region ap-south-1 --repository-name podinfo --force
+terraform state rm 'module.ecr.aws_ecr_repository.this[0]'</code></pre></div></dd></dl></article><article class="issue"><h4 id="i-eip">Elastic IP left behind<span class="tag">teardown</span></h4><dl><dt>Symptom</dt><dd><p>Destroy stalls or an address still shows in <code>describe-addresses</code>.</p></dd><dt>Cause</dt><dd><p>An unassociated EIP survived the NAT gateway removal.</p></dd><dt>Fix</dt><dd><div class="code"><span class="clabel">bash</span><pre><code>aws ec2 release-address --region ap-south-1 --allocation-id &lt;alloc-id&gt;
+terraform destroy -auto-approve</code></pre></div></dd></dl></article></div><h3>Cluster platform</h3><div class="issues"><article class="issue"><h4 id="i-pvc">Jenkins pod stuck Pending<span class="tag">storage</span></h4><dl><dt>Symptom</dt><dd><p><code>jenkins-0</code> stays <code>Pending</code> with <i>unbound immediate PersistentVolumeClaims</i>.</p></dd><dt>Cause</dt><dd><p>The <code>gp2</code> StorageClass used the in-tree <code>kubernetes.io/aws-ebs</code> provisioner, which is removed from EKS 1.34 onward, so nothing created the volume.</p></dd><dt>Fix</dt><dd><p>Add the <code>aws-ebs-csi-driver</code> add-on with its IRSA role and make a CSI-based <code>gp3</code> class the default. Commands are in <a href="#s11">section 11.1</a>.</p></dd></dl></article></div><h3>Canary and metrics</h3><div class="issues"><article class="issue"><h4 id="i-canary">Canary always rolled back on a healthy app<span class="tag">canary</span></h4><dl><dt>Symptom</dt><dd><p>Flagger rolled back with <i>no values found for nginx metric request-success-rate</i> while every request returned HTTP 200.</p></dd><dt>Cause</dt><dd><ol class="plain"><li>Prometheus scraped every 1 minute but the query used <code>rate(...[1m])</code>. One sample per window, and <code>rate()</code> needs at least two.</li><li>The built-in query filters on <code>exported_namespace</code>, but the metrics carry <code>namespace</code>.</li><li>The loadtester sent bursts with gaps, and stray 404 and 504 responses spiked the error rate during the gaps.</li></ol></dd><dt>Fix</dt><dd><ol class="plain"><li>Scrape every 15 s so a one-minute window holds about four samples.</li><li>Use the custom MetricTemplate from <a href="#s10">section 10.1</a>.</li><li>Run the always-on traffic-generator, a longer higher-concurrency loadtester, and a 5% error threshold.</li></ol><p>Result: clean promotion on good versions, and rollback still fires on genuinely bad ones.</p></dd></dl></article><article class="issue"><h4 id="i-nan">Success-rate query returned NaN<span class="tag">canary</span></h4><dl><dt>Symptom</dt><dd><p>The metric intermittently evaluated to NaN while debugging.</p></dd><dt>Cause</dt><dd><p>When traffic dropped to zero the formula divided 0 by 0.</p></dd><dt>Fix</dt><dd><p>The <code>or on() vector(0)</code> fallback in the template turns no traffic into 0% error. Continuous traffic keeps the window populated.</p></dd></dl></article></div><h3>Networking</h3><div class="issues"><article class="issue"><h4 id="i-nlb">NLB internal, app unreachable<span class="tag">network</span></h4><dl><dt>Symptom</dt><dd><p>The app could not be reached from the internet.</p></dd><dt>Cause</dt><dd><p>The NGINX NLB defaulted to the internal scheme.</p></dd><dt>Fix</dt><dd><p>Add the internet-facing annotation shown in <a href="#s9">section 9.4</a>. The NLB is recreated.</p></dd></dl></article><article class="issue"><h4 id="i-host">Ingress host versus browser access<span class="tag">network</span></h4><dl><dt>Symptom</dt><dd><p>Removing the ingress host allowed raw-NLB browsing but broke the canary. Restoring it fixed the canary and broke direct browsing. Under WSL, editing the Linux hosts file also did not help a Windows browser.</p></dd><dt>Cause</dt><dd><p>Flagger's NGINX canary requires a host for weighted routing and metric labelling, and <code>recharge.example.com</code> has no DNS.</p></dd><dt>Fix</dt><dd><p>Keep the host. Browse through a hosts-file entry (the Windows hosts file for a Windows browser) or <code>kubectl port-forward</code>. Production would use Route 53.</p></dd></dl></article></div><h3>Jenkins on EC2 (abandoned path)</h3><div class="issues"><article class="issue"><h4 id="i-ec2">ECR push denied, then pivot to in-cluster Jenkins<span class="tag">decision</span></h4><dl><dt>Symptom</dt><dd><p>Jenkins on EC2 with an <code>eks-jenkins</code> instance role was denied on ECR push. Giving it user credentials would also hit the one-hour SSO expiry.</p></dd><dt>Cause</dt><dd><p>The <code>eks-jenkins</code> role was a new principal outside the SCP exclusion.</p></dd><dt>Fix</dt><dd><p>Move Jenkins into the cluster and use the node role, which is already excluded and refreshes itself. No new SCP request, no stored keys, no expiry. The EC2 instance was stopped.</p></dd></dl></article><article class="issue"><h4 id="i-java">Jenkins fails to start on Java 17<span class="tag">EC2 attempt</span></h4><dl><dt>Symptom</dt><dd><p><code>Running with Java 17 ... older than the minimum required version (Java 21)</code> on Jenkins 2.568.3.</p></dd><dt>Cause</dt><dd><p>Java 17 was installed.</p></dd><dt>Fix</dt><dd><div class="code"><span class="clabel">bash</span><pre><code>sudo apt install openjdk-21-jre
+sudo update-alternatives --config java    # select Java 21
+sudo systemctl restart jenkins</code></pre></div></dd></dl></article><article class="issue"><h4 id="i-gpg">apt rejects the Jenkins repository<span class="tag">EC2 attempt</span></h4><dl><dt>Symptom</dt><dd><p><code>NO_PUBKEY 7198F4B714ABFC68</code> and <i>repository is not signed</i>.</p></dd><dt>Cause</dt><dd><p>The downloaded <code>.asc</code> file did not contain the signing key.</p></dd><dt>Fix</dt><dd><p>Import the exact key from a keyserver, export it to the apt keyring, then install Jenkins.</p><div class="code"><span class="clabel">bash</span><pre><code>gpg --keyserver keyserver.ubuntu.com --recv-keys 7198F4B714ABFC68</code></pre></div></dd></dl></article></div></section>
+<section id="s16">
+<h2><span class="n">16</span>Key decisions</h2>
+<div class="tablewrap"><table class=""><thead><tr><th>Decision</th><th>Chosen</th><th>Why</th></tr></thead><tbody><tr><td>Provisioning tool</td><td><b>Terraform</b>, not eksctl</td><td>Infrastructure-as-code skills, full resource visibility, matches a real stack</td></tr><tr><td>Canary traffic router</td><td><b>NGINX Ingress</b>, not ALB</td><td>First-class Flagger support, simpler and cheaper for a lab</td></tr><tr><td>CI location</td><td><b>In-cluster Jenkins</b>, not EC2 or local</td><td>Node-role ECR auth avoids both the SCP and the SSO expiry</td></tr><tr><td>Image build in Kubernetes</td><td><b>Kaniko</b></td><td>No Docker daemon is available in pods</td></tr><tr><td>Jenkins ECR auth</td><td><b>Node role</b>, not IRSA or an EC2 role</td><td>The only principal already SCP-excluded, and it survives rebuilds</td></tr><tr><td>KMS secret encryption</td><td><b>Disabled</b></td><td>Lead's call: a simple static app, avoids KMS permissions and cost</td></tr><tr><td>Terraform state locking</td><td><b>Native S3 lockfile</b>, not DynamoDB</td><td>Preference, supported from Terraform 1.10</td></tr><tr><td>AWS-native CI</td><td><b>Not used</b> (CodePipeline, CodeCommit)</td><td>CodeCommit is closed to new customers, extra permissions were needed, and Jenkins fit the stack</td></tr></tbody></table></div>
+</section>
+
+<section id="s17">
+<h2><span class="n">17</span>Lessons</h2>
+<ol class="plain">
+<li>When IAM looks right and calls still fail, look for an SCP deny. Every new principal that needs EKS or ECR may need its own exclusion.</li>
+<li>Canary metrics are timing-sensitive. The scrape interval must sit well under the query window, and the canary needs continuous traffic.</li>
+<li>From EKS 1.34 the EBS CSI add-on is mandatory for persistent volumes.</li>
+<li>Match where CI runs to how it authenticates. In-cluster CI with the node role removed stored keys and expiry.</li>
+<li>Keep app and GitOps in separate repos and let CI bridge them with an image tag commit.</li>
+<li><code>terraform import</code> and <code>state rm</code> are how a partial apply is recovered.</li>
+<li>Zero-downtime upgrades need gradual node replacement, more than one replica and a sensible surge setting.</li>
+</ol>
+</section>
+
+<section id="s18">
+<h2><span class="n">18</span>Repository layout</h2>
+<div class="code"><span class="clabel">tree</span><pre><code>canary_p/
+├── terraform/                 VPC, EKS, ECR, IRSA, EBS CSI
+├── gitops/                    Flux-reconciled manifests
+│   ├── clusters/practice/     Flux bootstrap and Kustomizations
+│   ├── infrastructure/        nginx, flagger, prometheus, loadtester, jenkins
+│   └── apps/recharge-system/  Deployment, HPA, Canary, traffic-generator
+├── recharge-system/           app source, Dockerfile, Jenkinsfile
+├── resume.sh  teardown.sh  setup-tf-backend.sh
+├── missing-permissions-policy.json
+└── PROJECT-DOCUMENTATION.md</code></pre></div>
+</section>
+
+</main>
+</div>
+<script>
+(function(){
+  document.querySelectorAll('.code').forEach(function(w){
+    var b=document.createElement('button');b.type='button';b.className='copy';b.textContent='Copy';
+    b.addEventListener('click',function(){
+      var el=w.querySelector('code');var t=el.innerText;
+      function done(m){b.textContent=m;setTimeout(function(){b.textContent='Copy'},1500)}
+      function sel(){var r=document.createRange();r.selectNodeContents(el);var s=window.getSelection();s.removeAllRanges();s.addRange(r);done('Selected')}
+      try{ if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(function(){done('Copied')},sel)}else{sel()} }catch(e){sel()}
+    });
+    w.appendChild(b);
+  });
+  try{ if(window.matchMedia('(max-width:959px)').matches){document.getElementById('toc').open=false} }catch(e){}
+})();
+</script>
+
+
+<script>
+(function(){
+  // Progress bar
+  var bar=document.getElementById('progress');
+  function prog(){var h=document.documentElement;var sc=h.scrollTop||document.body.scrollTop;
+    var mx=(h.scrollHeight-h.clientHeight)||1;bar.style.width=(sc/mx*100)+'%';
+    var tt=document.getElementById('toTop');if(sc>400)tt.classList.add('show');else tt.classList.remove('show');}
+  window.addEventListener('scroll',prog,{passive:true});prog();
+
+  // Theme toggle (document already supports data-theme)
+  var tb=document.getElementById('themeBtn');
+  tb.addEventListener('click',function(){
+    var cur=document.documentElement.getAttribute('data-theme');
+    var dark=cur? cur==='dark' : window.matchMedia('(prefers-color-scheme:dark)').matches;
+    document.documentElement.setAttribute('data-theme', dark?'light':'dark');
+  });
+
+  // Back to top
+  document.getElementById('toTop').addEventListener('click',function(){window.scrollTo({top:0,behavior:'smooth'})});
+
+  // Count-up stats when visible
+  var seen=false;
+  function countUp(){
+    if(seen)return; var strip=document.getElementById('stats'); if(!strip)return;
+    var r=strip.getBoundingClientRect(); if(r.top>window.innerHeight||r.bottom<0)return; seen=true;
+    strip.querySelectorAll('.big').forEach(function(el){
+      var target=parseInt(el.getAttribute('data-count'),10)||0;
+      var pre=el.getAttribute('data-prefix')||''; var suf=el.getAttribute('data-suffix')||'';
+      var n=0, step=Math.max(1,Math.ceil(target/40));
+      var t=setInterval(function(){n+=step; if(n>=target){n=target;clearInterval(t)}
+        el.textContent=pre+n+suf;},25);
+    });
+  }
+  window.addEventListener('scroll',countUp,{passive:true});countUp();
+
+  // Section reveal on scroll
+  var secs=document.querySelectorAll('main section');
+  secs.forEach(function(s){s.classList.add('reveal')});
+  if('IntersectionObserver' in window){
+    var io=new IntersectionObserver(function(es){es.forEach(function(e){
+      if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}})},{threshold:.08});
+    secs.forEach(function(s){io.observe(s)});
+  } else { secs.forEach(function(s){s.classList.add('in')}); }
+
+  // TOC scroll-spy
+  var links=Array.prototype.slice.call(document.querySelectorAll('.toc a[href^="#"]'));
+  var map=links.map(function(a){var id=a.getAttribute('href').slice(1);return {a:a,el:document.getElementById(id)}}).filter(function(x){return x.el});
+  function spy(){var pos=window.scrollY+120;var cur=null;
+    map.forEach(function(x){if(x.el.offsetTop<=pos)cur=x});
+    links.forEach(function(a){a.classList.remove('active')});
+    if(cur)cur.a.classList.add('active');}
+  window.addEventListener('scroll',spy,{passive:true});spy();
+})();
+</script>
+</body>
+</html>
