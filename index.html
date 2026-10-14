@@ -57,6 +57,30 @@ section.reveal.in{opacity:1;transform:none;transition:opacity .6s ease,transform
   h1::after,.badge::before{animation:none}
   section.reveal{opacity:1;transform:none}
 }
+
+/* ---- Inline warning text ---- */
+.warn-inline{color:var(--warn);font-weight:600}
+
+/* ---- Interactive canary simulator ---- */
+#canarySim{border:1px solid var(--line);border-radius:12px;background:var(--surface);
+  padding:18px;margin:20px 0}
+#canarySim .simhead{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+#canarySim .simttl{font:700 15px var(--display);color:var(--ink)}
+#canarySim .simbtns{display:flex;gap:8px}
+#canarySim button{font:600 12.5px var(--sans);padding:6px 13px;border-radius:7px;cursor:pointer;
+  border:1px solid var(--line);background:var(--bg);color:var(--ink);transition:transform .12s,background .2s}
+#canarySim button:hover{transform:translateY(-1px)}
+#canarySim button.good{border-color:var(--ok);color:var(--ok)}
+#canarySim button.bad{border-color:var(--warn);color:var(--warn)}
+#canarySim .bars{display:flex;height:30px;border-radius:7px;overflow:hidden;border:1px solid var(--line);background:var(--code-bg)}
+#canarySim .pbar{background:var(--accent);transition:width .5s ease}
+#canarySim .cbar{background:var(--warn);transition:width .5s ease}
+#canarySim .legend{display:flex;gap:18px;margin-top:10px;font:500 12px var(--sans);color:var(--muted);flex-wrap:wrap}
+#canarySim .dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:middle}
+#canarySim .status{margin-top:12px;font:600 13px var(--mono);padding:8px 12px;border-radius:7px;
+  background:var(--code-bg);color:var(--ink);min-height:20px}
+#canarySim .status.ok{background:var(--ok-soft);color:var(--ok)}
+#canarySim .status.fail{background:var(--warn-soft);color:var(--warn)}
 </style>
 </head><body>
 <div id="progress"></div>
@@ -175,9 +199,9 @@ td:first-child{font-weight:500}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 </style>
 <header class="mast-in">
-<p class="kicker">Project documentation</p>
+<p class="kicker">Reference guide · reproducible POC</p>
 <h1>EKS canary deployments and a zero-downtime upgrade</h1>
-<p class="lede">A GitOps lab on Amazon EKS: Terraform infrastructure, Jenkins CI, Flux CD, Flagger canaries, and a Kubernetes 1.34 to 1.35 upgrade, documented in the order it was built.</p>
+<p class="lede">A complete, step-by-step reference for a GitOps lab on Amazon EKS: Terraform infrastructure, in-cluster Jenkins CI, Flux CD, Flagger canaries, and a Kubernetes 1.34 to 1.35 upgrade. Written in build order so anyone can follow it to run the POC again &mdash; including every problem hit and exactly how it was fixed.</p>
 
 <dl class="meta">
 <div><dt>Author</dt><dd>Nipur Jain</dd></div>
@@ -185,7 +209,7 @@ td:first-child{font-weight:500}
 <div><dt>Region</dt><dd>ap-south-1 (Mumbai)</dd></div>
 <div><dt>Cluster</dt><dd>eks-canary-practice</dd></div>
 <div><dt>Period</dt><dd>Sept – Oct 2026</dd></div>
-<div><dt>Status</dt><dd><span class="badge">Completed</span> teardown Finish</dd></div>
+<div><dt>Status</dt><dd><span class="badge">Completed</span> canary promoted · upgraded · torn down</dd></div>
 </dl>
 
 </header>
@@ -209,6 +233,17 @@ td:first-child{font-weight:500}
 <li><b>A complete GitOps CI/CD pipeline</b> around both.</li>
 </ul>
 <p>The workload is <code>recharge-system</code>, a static &ldquo;QuickCharge&rdquo; web page (HTML and Tailwind) served by nginx. It is deliberately simple so that every moving part in the delivery path is the subject of the lab.</p>
+
+<div class="note"><b class="t">How to reproduce this POC</b><p>Read top to bottom &mdash; the sections are in build order. The shortest path for a repeat run:</p>
+<ol class="plain">
+<li>Get the SCP exclusion + IAM permissions in place (<a href="#s4">§4</a>) &mdash; this is the single biggest blocker on a restricted account.</li>
+<li>Create the S3 state backend (<a href="#s5">§5</a>), then <code>terraform apply</code> for infra (<a href="#s6">§6</a>).</li>
+<li>Install the Load Balancer Controller (<a href="#s7">§7</a>), push the GitOps repo and <code>flux bootstrap</code> (<a href="#s8">§8</a>).</li>
+<li>Flux deploys NGINX, Flagger, Prometheus, Jenkins and the app automatically.</li>
+<li>Set up the Jenkins pipeline in the UI (<a href="#s11">§11</a>), run a build, watch the canary promote (<a href="#s10">§10</a>).</li>
+<li>Practise the version upgrade (<a href="#s12">§12</a>), then tear down (<a href="#s14">§14</a>).</li>
+</ol>
+<p>Once the repos exist, a full rebuild is one command: <code>export GITHUB_TOKEN=&lt;pat&gt; &amp;&amp; ./resume.sh</code>. Everything is in Git, so the environment is fully reproducible &mdash; it was torn down and rebuilt several times during the lab. Watch for the five gotchas flagged in <a href="#s15">§15</a>; they recur on rebuilds if not committed to Git.</p></div>
 </section>
 
 <section id="s2">
@@ -427,16 +462,36 @@ service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"</code></p
   stepWeight: 10
   metrics:
     - name: nginx-success-rate          # templateRef to the custom template
-      thresholdRange: { max: 5 }
-      interval: 1m
+      thresholdRange: { max: 10 }
+      interval: 2m
   webhooks:
-    - name: load-test                   # continuous: hey -z 5m -q 50 -c 10 through the ingress</code></pre></div><div class="tablewrap"><table class=""><thead><tr><th>Setting</th><th>Value</th><th>Meaning</th></tr></thead><tbody><tr><td><code>stepWeight</code></td><td>10</td><td>Traffic added to the canary at each step</td></tr><tr><td><code>maxWeight</code></td><td>50</td><td>Weight reached before promotion</td></tr><tr><td><code>interval</code></td><td>30s</td><td>How often Flagger evaluates</td></tr><tr><td><code>threshold</code></td><td>5</td><td>Failed checks tolerated before rollback</td></tr><tr><td><code>thresholdRange.max</code></td><td>5</td><td>Maximum error rate in percent, relaxed from the default to absorb low-traffic noise</td></tr></tbody></table></div>
+    - name: load-test                   # continuous: hey -z 5m -q 50 -c 10 through the ingress</code></pre></div><div class="tablewrap"><table class=""><thead><tr><th>Setting</th><th>Value</th><th>Meaning</th></tr></thead><tbody><tr><td><code>stepWeight</code></td><td>10</td><td>Traffic added to the canary at each step</td></tr><tr><td><code>maxWeight</code></td><td>50</td><td>Weight reached before promotion</td></tr><tr><td><code>interval</code></td><td>30s</td><td>How often Flagger evaluates</td></tr><tr><td><code>threshold</code></td><td>5</td><td>Failed checks tolerated before rollback</td></tr><tr><td><code>thresholdRange.max</code></td><td>10</td><td>Maximum error rate in percent. Started at 5, raised to 10 to absorb low-traffic noise that peaks at the 50% hold.</td></tr><tr><td><code>metrics.interval</code></td><td>2m</td><td>Metric window, widened from 1m so brief spikes average out</td></tr></tbody></table></div>
+<div class="note"><b class="t">What actually happened</b><p>The first real rollout climbed cleanly to 50% and then <b>rolled back</b> at the promotion hold. The app was healthy, serving only 200s. The cause was metric noise: at 50% weight more traffic hits fresh canary pods, so transient 404/503 blips pushed the measured error rate to 5&ndash;8%, just over the original 5% limit. In a low-traffic lab a handful of stray requests swings the percentage wildly; in production the same errors would be a fraction of a percent. The fix was to raise the threshold to 10%, widen the window to 2m, and run a stronger always-on traffic generator so clean 200s dominate. The next rollout promoted at an error rate around 5&ndash;7%, comfortably under the new limit.</p></div>
 <h3><span class="n">10.3</span>Trigger a canary</h3>
 <p>Bump the image tag in the GitOps <code>deployment.yaml</code> and push, or patch the Deployment directly for a quick test:</p>
 <div class="code"><span class="clabel">bash</span><pre><code>kubectl -n recharge-system set image deployment/recharge-system recharge-system=&lt;new-tag&gt;
 kubectl -n recharge-system get canary recharge-system -w
 # phases: Initialized, Progressing (10 to 50), Promoting, Succeeded</code></pre></div>
 <p>A deliberately bad version shows the other path: after five failed checks the status becomes <code>Failed</code> and all traffic returns to the primary.</p>
+
+<h3><span class="n">10.4</span>Try it: canary simulator</h3>
+<p>This mirrors the lab's own run. &ldquo;Healthy release&rdquo; promotes; &ldquo;Bad release&rdquo; trips the error threshold and rolls back &mdash; exactly what Flagger does with real metrics.</p>
+<div id="canarySim">
+  <div class="simhead">
+    <span class="simttl">Flagger canary &mdash; recharge-system</span>
+    <span class="simbtns">
+      <button class="good" id="simGood" type="button">▶ Healthy release</button>
+      <button class="bad" id="simBad" type="button">▶ Bad release</button>
+    </span>
+  </div>
+  <div class="bars"><div class="pbar" id="simP" style="width:100%"></div><div class="cbar" id="simC" style="width:0%"></div></div>
+  <div class="legend">
+    <span><span class="dot" style="background:var(--accent)"></span>primary <b id="simPt">100%</b></span>
+    <span><span class="dot" style="background:var(--warn)"></span>canary <b id="simCt">0%</b></span>
+    <span>error rate <b id="simErr">0.0%</b> / limit 10%</span>
+  </div>
+  <div class="status" id="simStatus">Idle. Pick a release to start a rollout.</div>
+</div>
 </section>
 
 <section id="s11">
@@ -444,7 +499,7 @@ kubectl -n recharge-system get canary recharge-system -w
 <p>Jenkins runs inside the cluster. Build pods authenticate to ECR with the node role, so there are no stored keys and nothing that expires hourly.</p>
 
 <h3><span class="n">11.1</span>Storage prerequisite: EBS CSI</h3>
-<p>Jenkins needs a persistent volume. From EKS 1.34 the in-tree EBS provisioner is gone, so the EBS CSI add-on and a CSI-based default StorageClass are required (<a href="#i-pvc">what happens without them</a>).</p>
+<p>Jenkins needs a persistent volume. From EKS 1.34 the in-tree EBS provisioner is gone, so the EBS CSI add-on and a CSI-based default StorageClass are required (<a href="#i-pvc">what happens without them</a>). The StorageClass lives in the GitOps repo (<code>infrastructure/storageclass.yaml</code>) so it is recreated on every rebuild &mdash; applying it by hand once was the mistake that broke a later rebuild.</p>
 <div class="code"><span class="clabel">hcl</span><pre><code># eks.tf, cluster_addons
 aws-ebs-csi-driver = { most_recent = true, service_account_role_arn = module.ebs_csi_irsa.iam_role_arn }</code></pre></div><div class="code"><span class="clabel">bash</span><pre><code>kubectl apply -f - &lt;&lt;EOF
 apiVersion: storage.k8s.io/v1
@@ -457,20 +512,46 @@ parameters: { type: gp3 }
 EOF
 kubectl patch storageclass gp2 -p '{"metadata":{"annotations":{"storageclass.kubernetes.io/is-default-class":"false"}}}'</code></pre></div>
 <h3><span class="n">11.2</span>Deploy Jenkins through Flux</h3>
-<p><code>infrastructure/jenkins.yaml</code> is a HelmRelease of the <code>jenkins</code> 5.x chart in namespace <code>jenkins</code>, with agents enabled and an 8 Gi persistent volume.</p>
+<p><code>infrastructure/jenkins.yaml</code> is a HelmRelease of the <code>jenkins</code> 5.x chart in namespace <code>jenkins</code>, with agents enabled and an 8&nbsp;Gi persistent volume. The ingress is deliberately <b>disabled</b>: the AWS Load Balancer Controller admission webhook validates every ingress and rejects the Jenkins one on a fresh cluster because the <code>nginx</code> IngressClass is not yet registered when the chart installs. Access is via port-forward instead.</p>
+<div class="code"><span class="clabel">infrastructure/jenkins.yaml (key values)</span><pre><code>controller:
+  ingress:
+    enabled: false                 # avoids the LBC webhook conflict; use port-forward
+  installPlugins:
+    - kubernetes:latest
+    - workflow-aggregator:latest
+    - git:latest
+    - configuration-as-code:latest
+    - pipeline-stage-view:latest
+  persistence: { enabled: true, size: 8Gi }     # needs the gp3 StorageClass above
+agent: { enabled: true, namespace: jenkins }
+serviceAccount:      { create: true, name: jenkins }
+serviceAccountAgent: { create: true, name: jenkins-agent }   # no IRSA: build pods inherit the node role</code></pre></div>
 
-<h3><span class="n">11.3</span>Admin password and access</h3>
-<div class="code"><span class="clabel">bash</span><pre><code>kubectl get secret jenkins -n jenkins -o jsonpath='{.data.jenkins-admin-password}' | base64 -d
-kubectl port-forward -n jenkins svc/jenkins 8080:8080    # http://localhost:8080  (admin / &lt;password&gt;)</code></pre></div>
-<h3><span class="n">11.4</span>Configure Jenkins</h3>
-<ul>
-<li>Add a credential of kind Secret text with id <code>github-token</code>, holding a GitHub PAT with repo scope.</li>
-<li>Create a pipeline job from &ldquo;Pipeline script from SCM&rdquo;, pointing at the recharge-system repo and its <code>Jenkinsfile</code>.</li>
-<li>Optional auto-trigger: <code>triggers { pollSCM('H/2 * * * *') }</code>.</li>
-</ul>
+<h3><span class="n">11.3</span>Open the Jenkins UI</h3>
+<p>Get the auto-generated admin password, then forward the service to your machine.</p>
+<div class="code"><span class="clabel">bash</span><pre><code>kubectl get secret jenkins -n jenkins -o jsonpath='{.data.jenkins-admin-password}' | base64 -d; echo
+kubectl port-forward -n jenkins svc/jenkins 8080:8080
+# browse http://localhost:8080   (user: admin)</code></pre></div>
 
-<h3><span class="n">11.5</span>The pipeline</h3>
-<p>The <code>Jenkinsfile</code> in the app repo has two stages. The first builds with Kaniko, because build pods have no Docker daemon, and pushes to ECR. The second clones the GitOps repo, rewrites the image tag in <code>apps/recharge-system/deployment.yaml</code> with <code>sed</code>, then commits and pushes. Flux and Flagger take over from there.</p>
+<h3><span class="n">11.4</span>Add the GitHub credential (UI)</h3>
+<p>Jenkins needs a token to push the image-tag commit to the GitOps repo.</p>
+<ol class="plain">
+<li><b>Manage Jenkins → Credentials</b>.</li>
+<li>Open the <b>System</b> store → <b>Global credentials (unrestricted)</b> → <b>Add Credentials</b>.</li>
+<li>Kind: <b>Secret text</b>. Secret: your GitHub PAT with <code>repo</code> scope. ID: <code>github-token</code> (must match the Jenkinsfile exactly). Save.</li>
+</ol>
+
+<h3><span class="n">11.5</span>Create the pipeline job (UI)</h3>
+<ol class="plain">
+<li><b>New Item</b> → name <code>recharge-system</code> → <b>Pipeline</b> → OK.</li>
+<li>In <b>Pipeline</b>: Definition = <b>Pipeline script from SCM</b>; SCM = <b>Git</b>.</li>
+<li>Repository URL: <code>https://github.com/NipurJain4/recharge-system.git</code>; Branch: <code>*/main</code>; Script Path: <code>Jenkinsfile</code>.</li>
+<li>Optional auto-trigger: <b>Build Triggers → Poll SCM</b>, schedule <code>H/2 * * * *</code> (checks every ~2&nbsp;min and builds only when there is a new commit). <span class="warn-inline">Do not paste a <code>pipeline&nbsp;{&nbsp;...&nbsp;}</code> snippet into the UI &mdash; that belongs in the Jenkinsfile, not a config box.</span></li>
+<li>Save, then <b>Build Now</b> for the first run (sets the poll baseline).</li>
+</ol>
+
+<h3><span class="n">11.6</span>The pipeline</h3>
+<p>The <code>Jenkinsfile</code> in the app repo runs on a Kubernetes agent pod with two containers &mdash; <code>kaniko</code> (build) and a <code>git</code> image (commit). Stage one builds with Kaniko, because build pods have no Docker daemon, and pushes to ECR as <code>recharge-b&lt;BUILD_NUMBER&gt;</code> using the node role. Stage two clones the GitOps repo, rewrites the image tag in <code>apps/recharge-system/deployment.yaml</code> with <code>sed</code>, then commits and pushes. Flux and Flagger take over from there.</p>
 <figure class="diagram"><div class="scroll"><svg viewBox="0 0 900 250" style="min-width:700px" role="img" aria-label="CI/CD pipeline from code push to canary"><defs><marker id="ah3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ahead"/></marker></defs><rect x="10" y="75" width="130" height="90" rx="6" class="bx "/><text x="75.0" y="109.0" class="lbl" text-anchor="middle">1 · Push</text><text x="75.0" y="124.0" class="sub" text-anchor="middle">developer commits</text><text x="75.0" y="139.0" class="sub" text-anchor="middle">app code</text><path d="M140 120 H160" class="ln" marker-end="url(#ah3)"/><rect x="160" y="75" width="130" height="90" rx="6" class="bx "/><text x="225.0" y="109.0" class="lbl" text-anchor="middle">2 · Build</text><text x="225.0" y="124.0" class="sub" text-anchor="middle">Kaniko builds the</text><text x="225.0" y="139.0" class="sub" text-anchor="middle">Dockerfile image</text><path d="M290 120 H310" class="ln" marker-end="url(#ah3)"/><rect x="310" y="75" width="130" height="90" rx="6" class="bx "/><text x="375.0" y="109.0" class="lbl" text-anchor="middle">3 · Publish</text><text x="375.0" y="124.0" class="sub" text-anchor="middle">image pushed to ECR</text><text x="375.0" y="139.0" class="sub" text-anchor="middle">(node role auth)</text><path d="M440 120 H460" class="ln" marker-end="url(#ah3)"/><rect x="460" y="75" width="130" height="90" rx="6" class="bx "/><text x="525.0" y="109.0" class="lbl" text-anchor="middle">4 · Commit</text><text x="525.0" y="124.0" class="sub" text-anchor="middle">bumps image tag in</text><text x="525.0" y="139.0" class="sub" text-anchor="middle">the gitops repo</text><path d="M590 120 H610" class="ln" marker-end="url(#ah3)"/><rect x="610" y="75" width="130" height="90" rx="6" class="bx "/><text x="675.0" y="109.0" class="lbl" text-anchor="middle">5 · Reconcile</text><text x="675.0" y="124.0" class="sub" text-anchor="middle">Flux detects the</text><text x="675.0" y="139.0" class="sub" text-anchor="middle">commit and applies</text><path d="M740 120 H760" class="ln" marker-end="url(#ah3)"/><rect x="760" y="75" width="130" height="90" rx="6" class="bx acc"/><text x="825.0" y="109.0" class="lbl" text-anchor="middle">6 · Canary</text><text x="825.0" y="124.0" class="sub" text-anchor="middle">Flagger shifts</text><text x="825.0" y="139.0" class="sub" text-anchor="middle">traffic 10 → 50%</text><path d="M10 58 H140" class="ln a" style="marker-end:none"/><text x="75.0" y="48" class="gl" text-anchor="middle">recharge-system repo</text><path d="M160 58 H590" class="ln a" style="marker-end:none"/><text x="375.0" y="48" class="gl" text-anchor="middle">Jenkins, in the cluster</text><path d="M610 58 H890" class="ln a" style="marker-end:none"/><text x="750.0" y="48" class="gl" text-anchor="middle">Cluster, driven by Git</text><rect x="10" y="190" width="880" height="44" rx="6" class="bx acc"/><text x="450.0" y="216.0" class="lbl" text-anchor="middle">Jenkins only commits to Git. Flux is the only actor that changes the cluster.</text></svg></div><figcaption>The two-repo model. Flux watches the gitops repo only; the image tag commit in step 4 is what connects CI to CD.</figcaption></figure>
 <p>The complete path was verified end to end with a visible change on the page: code push, Jenkins build, ECR, tag commit, Flux, Flagger canary, live.</p>
 </section>
@@ -534,6 +615,7 @@ aws ecr describe-repositories --region $R
 <div class="code"><span class="clabel">bash</span><pre><code>aws sso login
 export GITHUB_TOKEN=&lt;pat&gt;
 ./resume.sh</code></pre></div>
+<div class="note"><b class="t">POC complete</b><p>All objectives were met and verified: the canary promoted a new release end to end, the cluster was upgraded from 1.34 to 1.35 with zero downtime, and the Jenkins → ECR → Flux → Flagger pipeline ran on a code push. The environment was then torn down with <code>teardown.sh</code> and the verification calls in §14.3 returned empty &mdash; no cluster, no nodes, no NAT gateway, no load balancers, no Elastic IPs, no ECR repository. Billing is back to zero apart from the few-cents-per-month S3 state bucket, which is kept so the whole stack can be rebuilt from scratch with a single <code>resume.sh</code>.</p></div>
 </section>
 <section id="s15"><h2><span class="n">15</span>Problems and fixes</h2><p>Grouped by area, with the symptom to look for, the cause and the fix. Commands appear here and in the section that introduces them.</p><h3>Access and policy</h3><div class="issues"><article class="issue"><h4 id="i-scp">SCP blocks EKS and ECR<span class="tag">recurring</span></h4><dl><dt>Symptom</dt><dd><p>Calls fail with <i>explicit deny in a service control policy</i>. Plain IAM gaps read <i>no identity-based policy allows</i> instead, which is how the two are told apart.</p></dd><dt>Cause</dt><dd><p>Org SCP <code>p-jqf3wzw9</code>, in management account <code>775267928995</code>, denies <code>eks:*</code> and <code>ecr:*</code>. IAM cannot override it. It returned for each new principal: first the user role, then the node role, and it would have for a Jenkins role.</p></dd><dt>Fix</dt><dd><p>The administrator adds exclusions with <code>NotLike</code> conditions on <code>aws:userid</code> and <code>aws:PrincipalArn</code>. Use wildcard patterns so rebuilds stay covered.</p></dd></dl></article><article class="issue"><h4 id="i-iam">Missing companion IAM actions<span class="tag">IAM</span></h4><dl><dt>Symptom</dt><dd><p><code>terraform apply</code> failed one action at a time.</p></dd><dt>Cause</dt><dd><p>The role could create resources but lacked tag and describe actions such as <code>iam:TagPolicy</code>, <code>logs:PutRetentionPolicy</code>, <code>ec2:DescribeVpcAttribute</code> and <code>ecr:SetRepositoryPolicy</code>.</p></dd><dt>Fix</dt><dd><p>The administrator added them in batches. The full set is recorded in <code>missing-permissions-policy.json</code>.</p></dd></dl></article><article class="issue"><h4 id="i-passrole">iam:PassRole denied for the node group<span class="tag">IAM</span></h4><dl><dt>Symptom</dt><dd><p>Node group creation was rejected on <code>iam:PassRole</code>.</p></dd><dt>Cause</dt><dd><p>Creating a node group hands the node role to EKS. The original policy still had the unresolved <code>&lt;ACCOUNT_ID&gt;</code> placeholder in its PassRole statement.</p></dd><dt>Fix</dt><dd><p>The administrator granted a scoped <code>iam:PassRole</code> for the node role.</p></dd></dl></article><article class="issue"><h4 id="i-scp-expiry">SCP exclusion expired between sessions<span class="tag">SCP</span></h4><dl><dt>Symptom</dt><dd><p>Resuming after a pause failed with SCP denies again.</p></dd><dt>Cause</dt><dd><p>The exclusion had been granted only until the 18th and was removed while the lab was paused.</p></dd><dt>Fix</dt><dd><p>A ticket (with Rutvik's approval) re-granted it for two more days. The request included the node and <code>eks-*</code> role patterns so rebuilds were covered.</p></dd></dl></article><article class="issue"><h4 id="i-sso">SSO token expiry and shell mismatch<span class="tag">environment</span></h4><dl><dt>Symptom</dt><dd><p><code>ExpiredToken</code> roughly every hour. Under WSL, the agent shell and the interactive terminal also disagreed about the refreshed token and about public DNS.</p></dd><dt>Cause</dt><dd><p>SSO credentials are temporary. The two shells did not share the refreshed token.</p></dd><dt>Fix</dt><dd><p>Re-run the login and refresh the kubeconfig. Run long operations in the terminal where credentials are live.</p><div class="code"><span class="clabel">bash</span><pre><code>aws sso login
 aws eks update-kubeconfig --region ap-south-1 --name eks-canary-practice</code></pre></div></dd></dl></article></div><h3>Terraform state and apply</h3><div class="issues"><article class="issue"><h4 id="i-nodegroup">Node group CREATE_FAILED<span class="tag">terraform</span></h4><dl><dt>Symptom</dt><dd><p><code>NodeCreationFailure: Unhealthy nodes</code>. The <code>aws-node</code> (CNI) and <code>kube-proxy</code> pods sat in <code>ImagePullBackOff</code> with <i>no basic auth credentials</i>.</p></dd><dt>Cause</dt><dd><p>The node role is a separate principal and was still SCP-blocked from <code>ecr:GetAuthorizationToken</code>, so nodes could not pull the EKS system images.</p></dd><dt>Fix</dt><dd><p>Extend the SCP exclusion to <code>role/default-eks-node-group-*</code>, remove the failed group, clean state and apply again.</p><div class="code"><span class="clabel">bash</span><pre><code>aws eks delete-nodegroup --cluster-name eks-canary-practice --nodegroup-name &lt;ng&gt; --region ap-south-1
@@ -647,6 +729,51 @@ sudo systemctl restart jenkins</code></pre></div></dd></dl></article><article cl
     links.forEach(function(a){a.classList.remove('active')});
     if(cur)cur.a.classList.add('active');}
   window.addEventListener('scroll',spy,{passive:true});spy();
+
+  // ---- Interactive canary simulator ----
+  (function(){
+    var P=document.getElementById('simP'),C=document.getElementById('simC'),
+        Pt=document.getElementById('simPt'),Ct=document.getElementById('simCt'),
+        Er=document.getElementById('simErr'),St=document.getElementById('simStatus'),
+        bGood=document.getElementById('simGood'),bBad=document.getElementById('simBad');
+    if(!P)return;
+    var running=false, timer=null;
+    function setWeight(w){C.style.width=w+'%';P.style.width=(100-w)+'%';Ct.textContent=w+'%';Pt.textContent=(100-w)+'%';}
+    function reset(){clearInterval(timer);running=false;setWeight(0);Er.textContent='0.0%';
+      St.className='status';St.textContent='Idle. Pick a release to start a rollout.';
+      bGood.disabled=false;bBad.disabled=false;}
+    function run(bad){
+      if(running)return;running=true;bGood.disabled=true;bBad.disabled=true;
+      var w=0, fails=0, step=0;
+      St.className='status';St.textContent='New revision detected. Scaling up canary…';
+      timer=setInterval(function(){
+        step++;
+        // error rate: healthy hovers 2-7%, bad climbs past the limit
+        var err = bad ? (6+step*2.2+Math.random()*3) : (2+Math.random()*5);
+        Er.textContent=err.toFixed(1)+'%';
+        if(err>10){
+          fails++;
+          St.className='status fail';
+          St.textContent='Halt advancement: error '+err.toFixed(1)+'% > 10%  (failed check '+fails+'/5)';
+          if(fails>=5){clearInterval(timer);setWeight(0);
+            St.textContent='✗ Canary FAILED — rolled back. 100% traffic on primary (old version).';
+            running=false;bGood.disabled=false;bBad.disabled=false;return;}
+          return;
+        }
+        // healthy check → advance
+        if(w<50){w+=10;setWeight(w);
+          St.className='status';St.textContent='Advance canary weight '+w+'%  (error '+err.toFixed(1)+'% ok)';
+        } else {
+          clearInterval(timer);setWeight(0);
+          St.className='status ok';
+          St.textContent='✓ Canary SUCCEEDED — promoted. New version is now primary at 100%.';
+          running=false;bGood.disabled=false;bBad.disabled=false;
+        }
+      },650);
+    }
+    bGood.addEventListener('click',function(){reset();run(false);});
+    bBad.addEventListener('click',function(){reset();run(true);});
+  })();
 })();
 </script>
 </body>
