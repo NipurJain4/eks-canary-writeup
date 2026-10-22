@@ -307,7 +307,7 @@ aws s3api put-bucket-versioning --bucket $BUCKET --versioning-configuration Stat
     encrypt      = true
     use_lockfile = true   # native S3 locking, no DynamoDB
   }
-}</code></pre></div><div class="code"><span class="clabel">bash</span><pre><code>cd terraform
+}</code></pre></div><div class="code"><span class="clabel">bash</span><pre><code>cd terraform/environments/practice
 terraform init -migrate-state</code></pre></div>
 </section>
 
@@ -324,10 +324,11 @@ node_min_size = 2   node_max_size = 4   node_desired_size = 2</code></pre></div>
 <h3><span class="n">6.2</span>Topology</h3>
 <figure class="diagram"><div class="scroll"><svg viewBox="0 0 900 470" style="min-width:700px" role="img" aria-label="AWS infrastructure provisioned by Terraform"><defs><marker id="ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="ahead"/></marker></defs><rect x="10" y="10" width="880" height="450" rx="10" class="grp"/><text x="20" y="26" class="gl" text-anchor="start">AWS account 821410798987 · ap-south-1</text><rect x="30" y="45" width="620" height="395" rx="10" class="grp"/><text x="40" y="61" class="gl" text-anchor="start">VPC 10.0.0.0/16</text><rect x="255" y="58" width="140" height="28" rx="6" class="bx "/><text x="325.0" y="76.0" class="lbl" text-anchor="middle">Internet Gateway</text><rect x="50" y="100" width="280" height="110" rx="10" class="grp"/><text x="320" y="116" class="gl" text-anchor="end">Public subnet · AZ a</text><rect x="70" y="135" width="120" height="50" rx="6" class="bx "/><text x="130.0" y="156.5" class="lbl" text-anchor="middle">NAT gateway</text><text x="130.0" y="171.5" class="sub" text-anchor="middle">+ Elastic IP</text><rect x="350" y="100" width="280" height="110" rx="10" class="grp"/><text x="620" y="116" class="gl" text-anchor="end">Public subnet · AZ b</text><rect x="370" y="135" width="140" height="50" rx="6" class="bx "/><text x="440.0" y="156.5" class="lbl" text-anchor="middle">NLB</text><text x="440.0" y="171.5" class="sub" text-anchor="middle">internet-facing</text><rect x="50" y="245" width="280" height="175" rx="10" class="grp"/><text x="320" y="261" class="gl" text-anchor="end">Private subnet · AZ a</text><rect x="70" y="285" width="240" height="60" rx="6" class="bx acc"/><text x="190.0" y="311.5" class="lbl" text-anchor="middle">Managed node</text><text x="190.0" y="326.5" class="sub" text-anchor="middle">t3.medium Spot · AL2023</text><rect x="350" y="245" width="280" height="175" rx="10" class="grp"/><text x="620" y="261" class="gl" text-anchor="end">Private subnet · AZ b</text><rect x="370" y="285" width="240" height="60" rx="6" class="bx acc"/><text x="490.0" y="311.5" class="lbl" text-anchor="middle">Managed node</text><text x="490.0" y="326.5" class="sub" text-anchor="middle">t3.medium Spot · AL2023</text><text x="50" y="434" class="sub" text-anchor="start">Both private route tables send 0.0.0.0/0 to the single NAT gateway.</text><path d="M130 285 V185" class="ln d" marker-end="url(#ah2)"/><path d="M130 135 V72 H255" class="ln" marker-end="url(#ah2)"/><path d="M440 135 V72 H395" class="ln" marker-end="url(#ah2)"/><path d="M325 58 V28" class="ln" marker-end="url(#ah2)"/><text x="333" y="40" class="sub" text-anchor="start">internet</text><rect x="675" y="60" width="205" height="70" rx="6" class="bx acc"/><text x="777.5" y="84.0" class="lbl" text-anchor="middle">EKS control plane v1.35</text><text x="777.5" y="99.0" class="sub" text-anchor="middle">AWS-managed, HA</text><text x="777.5" y="114.0" class="sub" text-anchor="middle">OIDC provider for IRSA</text><rect x="675" y="145" width="205" height="50" rx="6" class="bx "/><text x="777.5" y="166.5" class="lbl" text-anchor="middle">ECR repository</text><text x="777.5" y="181.5" class="sub" text-anchor="middle">podinfo · keep last 10</text><rect x="675" y="210" width="205" height="130" rx="6" class="bx "/><text x="687" y="230" class="lbl" text-anchor="start">IAM roles</text><text x="687" y="248" class="sub" text-anchor="start">Cluster role</text><text x="687" y="263" class="sub" text-anchor="start">Node role + ECR push policy</text><text x="687" y="278" class="sub" text-anchor="start">IRSA: LB controller</text><text x="687" y="293" class="sub" text-anchor="start">IRSA: EBS CSI driver</text><text x="687" y="308" class="sub" text-anchor="start">IRSA: Jenkins (reserved)</text><rect x="675" y="355" width="205" height="70" rx="6" class="bx "/><text x="777.5" y="379.0" class="lbl" text-anchor="middle">S3 state bucket</text><text x="777.5" y="394.0" class="sub" text-anchor="middle">versioned</text><text x="777.5" y="409.0" class="sub" text-anchor="middle">native lockfile</text><path d="M675 95 H655 V315 H610" class="ln d" marker-end="url(#ah2)"/></svg></div><figcaption>Topology of what Terraform creates. The dashed line is the node-to-control-plane channel; the NLB is created later by the NGINX Service.</figcaption></figure>
 <h3><span class="n">6.3</span>What each file creates</h3>
-<p>About 65 resources in total. KMS secret encryption is off (<code>create_kms_key = false</code>), a decision recorded in section 16.</p>
-<div class="tablewrap"><table class=""><thead><tr><th>File</th><th>Creates</th></tr></thead><tbody><tr><td><code>vpc.tf</code></td><td>VPC 10.0.0.0/16, two public and two private subnets, one NAT gateway, Internet Gateway, EKS and ALB discovery tags</td></tr><tr><td><code>eks.tf</code></td><td>Cluster with public endpoint and OIDC. Managed node group (AL2023, t3.medium Spot, 33% surge). Add-ons: coredns, kube-proxy, vpc-cni, eks-pod-identity-agent, aws-ebs-csi-driver. Access entries. <code>ecr_push</code> policy on the node group role.</td></tr><tr><td><code>ecr.tf</code></td><td>ECR repository <code>podinfo</code> with scan on push and a keep-last-10 lifecycle</td></tr><tr><td><code>irsa.tf</code></td><td>IRSA role for the AWS Load Balancer Controller</td></tr><tr><td><code>ebs-csi-irsa.tf</code></td><td>IRSA role for the EBS CSI driver</td></tr><tr><td><code>jenkins-irsa.tf</code></td><td>IRSA role for Jenkins, reserved and unused because builds use the node role</td></tr><tr><td><code>node-ecr-push.tf</code></td><td>ECR push policy attached to the node role</td></tr><tr><td><code>versions.tf</code>, <code>providers.tf</code>, <code>variables.tf</code>, <code>data.tf</code>, <code>outputs.tf</code>, <code>backend.tf</code></td><td>Provider pins, variables, data sources, outputs and the S3 backend</td></tr></tbody></table></div>
+<p>About 65 resources in total. KMS secret encryption is off (<code>create_kms_key = false</code>), a decision recorded in section 17. The configuration uses a production layout: reusable <b>modules</b> composed by a per-environment root. You run Terraform from <code>terraform/environments/practice</code>.</p>
+<div class="tablewrap"><table class=""><thead><tr><th>Module / file</th><th>Creates</th></tr></thead><tbody><tr><td><code>modules/network</code></td><td>VPC 10.0.0.0/16, two public and two private subnets, one NAT gateway, Internet Gateway, EKS and ALB discovery tags (wraps <code>terraform-aws-modules/vpc</code>)</td></tr><tr><td><code>modules/cluster</code></td><td>EKS cluster with public endpoint and OIDC. Managed node group (AL2023, t3.medium Spot, 33% surge). Core add-ons: coredns, kube-proxy, vpc-cni, eks-pod-identity-agent. Access entries. The <code>node-ecr-push</code> policy on the node group role.</td></tr><tr><td><code>modules/registry</code></td><td>ECR repository <code>podinfo</code> with scan on push and a keep-last-10 lifecycle</td></tr><tr><td><code>modules/iam</code></td><td>Three IRSA roles — AWS Load Balancer Controller, EBS CSI driver, and Jenkins (ECR push)</td></tr><tr><td><code>environments/practice/main.tf</code></td><td>Composes the four modules and declares the <code>aws-ebs-csi-driver</code> addon (placed here, after <code>iam</code>, to avoid a cluster↔iam OIDC cycle)</td></tr><tr><td><code>environments/practice/</code> (rest)</td><td><code>variables.tf</code>, <code>terraform.tfvars</code>, <code>outputs.tf</code>, <code>providers.tf</code>, <code>versions.tf</code>, <code>backend.tf</code> (S3 state)</td></tr></tbody></table></div>
 <h3><span class="n">6.4</span>Plan and apply</h3>
-<div class="code"><span class="clabel">bash</span><pre><code>terraform plan     # review, about 65 resources
+<div class="code"><span class="clabel">bash</span><pre><code>cd terraform/environments/practice
+terraform plan     # review, about 65 resources
 terraform apply    # about 15 to 20 min for the cluster</code></pre></div>
 <p>A first apply on a restricted account rarely goes through cleanly. The failures met here and their fixes are in <a href="#i-nodegroup">node group CREATE_FAILED</a>, <a href="#i-drift">state drift</a> and <a href="#i-scp">the SCP block</a>.</p>
 
@@ -340,7 +341,7 @@ terraform output       # cluster_endpoint, ecr_repository_url, *_role_arn</code>
 <section id="s7">
 <h2><span class="n">7</span>AWS Load Balancer Controller</h2>
 <p>Terraform created the IRSA role. The controller is installed with Helm against a service account that is created first and annotated with that role.</p>
-<div class="code"><span class="clabel">bash</span><pre><code>cd terraform
+<div class="code"><span class="clabel">bash</span><pre><code>cd terraform/environments/practice
 CLUSTER=eks-canary-practice; R=ap-south-1
 LBC_ROLE=$(terraform output -raw lb_controller_role_arn)
 VPC_ID=$(aws eks describe-cluster --name $CLUSTER --region $R \
@@ -500,8 +501,13 @@ kubectl -n recharge-system get canary recharge-system -w
 
 <h3><span class="n">11.1</span>Storage prerequisite: EBS CSI</h3>
 <p>Jenkins needs a persistent volume. From EKS 1.34 the in-tree EBS provisioner is gone, so the EBS CSI add-on and a CSI-based default StorageClass are required (<a href="#i-pvc">what happens without them</a>). The StorageClass lives in the GitOps repo (<code>infrastructure/storageclass.yaml</code>) so it is recreated on every rebuild &mdash; applying it by hand once was the mistake that broke a later rebuild.</p>
-<div class="code"><span class="clabel">hcl</span><pre><code># eks.tf, cluster_addons
-aws-ebs-csi-driver = { most_recent = true, service_account_role_arn = module.ebs_csi_irsa.iam_role_arn }</code></pre></div><div class="code"><span class="clabel">bash</span><pre><code>kubectl apply -f - &lt;&lt;EOF
+<div class="code"><span class="clabel">hcl</span><pre><code># environments/practice/main.tf — declared at the root (after the iam module)
+# to avoid a cluster↔iam OIDC dependency cycle.
+resource "aws_eks_addon" "ebs_csi" {
+  cluster_name             = module.cluster.cluster_name
+  addon_name               = "aws-ebs-csi-driver"
+  service_account_role_arn = module.iam.ebs_csi_role_arn
+}</code></pre></div><div class="code"><span class="clabel">bash</span><pre><code>kubectl apply -f - &lt;&lt;EOF
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata: { name: gp3, annotations: { "storageclass.kubernetes.io/is-default-class": "true" } }
@@ -567,8 +573,8 @@ aws eks describe-cluster-versions --region ap-south-1 \
   --query 'clusterVersions[].clusterVersion' --output text      # confirm 1.35 is available
 kubectl get pods -A | grep -vE "Running|Completed"              # baseline should be empty</code></pre></div>
 <h3><span class="n">12.2</span>Upgrade</h3>
-<p>Change <code>cluster_version</code> from <code>"1.34"</code> to <code>"1.35"</code> in <code>terraform/variables.tf</code>. The add-ons use <code>most_recent = true</code>, so they move to 1.35-compatible versions in the same apply.</p>
-<div class="code"><span class="clabel">bash</span><pre><code>cd terraform
+<p>Change <code>cluster_version</code> from <code>"1.34"</code> to <code>"1.35"</code> in <code>terraform/environments/practice/terraform.tfvars</code>. The add-ons use <code>most_recent = true</code>, so they move to 1.35-compatible versions in the same apply.</p>
+<div class="code"><span class="clabel">bash</span><pre><code>cd terraform/environments/practice
 terraform plan     # expect only "updated in-place": cluster, node group, add-ons
 terraform apply    # about 25 to 30 min in total</code></pre></div>
 <h3><span class="n">12.3</span>Watch from a second terminal</h3>
@@ -682,7 +688,9 @@ sudo systemctl restart jenkins</code></pre></div></dd></dl></article><article cl
 <h2><span class="n">19</span>Repository layout</h2>
 <div class="code"><span class="clabel">tree</span><pre><code>canary_p/
 ├── README.md                  entry point
-├── terraform/                 VPC, EKS, ECR, IRSA, EBS CSI (13 .tf files)
+├── terraform/                 Infrastructure as code (production layout)
+│   ├── modules/               network, cluster, registry, iam (reusable)
+│   └── environments/practice/ main.tf composition + tfvars + backend (run here)
 ├── gitops/                    Flux-reconciled manifests (manifests only)
 │   ├── clusters/practice/     Flux bootstrap and Kustomizations
 │   ├── infrastructure/        nginx, flagger, prometheus, grafana, loadtester, jenkins, storageclass
